@@ -1,0 +1,10 @@
+[Unit]
+Description=Auto-sync omarchy-agents-companion plugin to git
+
+[Service]
+Type=simple
+ExecStart=/bin/bash -c 'dir="$HOME/.config/omarchy/plugins/gusthx.agents"; while inotifywait -q -r -e close_write,create,delete,move "$dir" >/dev/null; do sleep 20; "%h/Work/omarchy-agents-companion/scripts/sync.sh" || true; done'
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
