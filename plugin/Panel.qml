@@ -1185,6 +1185,8 @@ Panel {
     if (panelFlick) panelFlick.contentY = 0
     usage.refreshLimits()
     Qt.callLater(function() { if (panel.loadedContent) panel.loadedContent.forceActiveFocus() })
+  } else {
+    root.tipBannerHovered = false
   }
 
   Main {

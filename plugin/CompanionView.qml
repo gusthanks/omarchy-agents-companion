@@ -256,7 +256,7 @@ Item {
         ? Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.40)
         : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
 
-      implicitHeight: visible ? (speechCardCol.implicitHeight + Style.space(16)) : 0
+      implicitHeight: visible ? (speechCardCol.implicitHeight + Style.space(20)) : 0
       height: visible ? implicitHeight : 0
 
       Column {
@@ -268,14 +268,20 @@ Item {
         spacing: Style.space(6)
 
         // Card Header Bar: Badge + Actions
-        Row {
+        Item {
           width: parent.width
-          spacing: Style.space(6)
+          implicitHeight: Math.max(badgePill.implicitHeight, cardActions.implicitHeight)
+          height: implicitHeight
 
           // Badge pill
           Rectangle {
-            implicitWidth: badgeText.implicitWidth + Style.space(8)
+            id: badgePill
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            implicitWidth: badgeText.implicitWidth + Style.space(12)
             implicitHeight: Style.space(18)
+            width: implicitWidth
+            height: implicitHeight
             radius: Style.cornerRadius
             color: root.isThinking
               ? Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.22)
@@ -293,17 +299,12 @@ Item {
             }
           }
 
-          // Spacer
-          Item {
-            width: Math.max(0, parent.width - parent.children[0].width - cardActions.width - Style.space(6))
-            height: 1
-          }
-
           // Trailing Actions (Copy, Clear)
           Row {
             id: cardActions
-            spacing: Style.space(4)
+            anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(4)
 
             // Copy button
             Rectangle {
