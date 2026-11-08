@@ -1409,6 +1409,8 @@ Panel {
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.title
                   font.bold: true
+                  elide: Text.ElideRight
+                  width: Math.min(implicitWidth, Math.max(Style.space(40), heroTitleRow.width - Style.space(90)))
                   anchors.verticalCenter: parent.verticalCenter
                 }
 
@@ -1416,7 +1418,7 @@ Panel {
                   id: heroBrainSelector
                   anchors.verticalCenter: parent.verticalCenter
                   maxWidth: (heroTitleRow.width > 0 && companionNameLabel.width > 0)
-                    ? Math.max(Style.space(40), heroTitleRow.width - companionNameLabel.width - heroTitleRow.spacing)
+                    ? Math.max(0, heroTitleRow.width - companionNameLabel.width - heroTitleRow.spacing)
                     : -1
                   modelId: root.companionModel
                   availableModels: root.availableModels
@@ -1437,6 +1439,7 @@ Panel {
                 text: {
                   if (root.addStage !== "") return root.addHeading.toUpperCase()
                   if (root.companionView && root.companionView.isThinking) return "THINKING..."
+                  if (!usage || !usage.formatTokenCount) return ""
                   if (root.totalTokensToday > 0) {
                     return Commons.I18n.tn("agents.tokensToday", root.totalTokensToday).arg(usage.formatTokenCount(root.totalTokensToday)).toUpperCase()
                   }
