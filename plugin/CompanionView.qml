@@ -227,16 +227,14 @@ Item {
 
   readonly property string displayBodyText: {
     if (lastResponseText !== "") return lastResponseText
-    if (currentInsight && currentInsight.details) return currentInsight.details
-    return "Click " + companionName + " above or ask any question about your laptop, tokens, or system state below."
+    if (isThinking) return "Thinking..."
+    return ""
   }
 
   readonly property string activeBadgeText: {
     if (copyFeedback !== "") return copyFeedback
     if (isThinking) return "THINKING..."
-    if (lastResponseText !== "") return companionName.toUpperCase() + " AI"
-    if (currentInsight && currentInsight.badge) return currentInsight.badge
-    return "INSIGHT"
+    return companionName.toUpperCase() + " AI"
   }
 
   // ------------------------------------------------------------- UI Layout
@@ -246,9 +244,10 @@ Item {
     width: parent.width
     spacing: Style.space(8)
 
-    // Sleek Speech Bubble / Insight Card
+    // Sleek Speech Bubble / Response Card
     Rectangle {
       id: speechCard
+      visible: root.lastResponseText !== "" || root.isThinking
       width: parent.width
       radius: Style.cornerRadius
       color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
@@ -257,8 +256,8 @@ Item {
         ? Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.40)
         : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
 
-      implicitHeight: speechCardCol.implicitHeight + Style.space(16)
-      height: implicitHeight
+      implicitHeight: visible ? (speechCardCol.implicitHeight + Style.space(16)) : 0
+      height: visible ? implicitHeight : 0
 
       Column {
         id: speechCardCol
@@ -268,7 +267,7 @@ Item {
         anchors.margins: Style.space(10)
         spacing: Style.space(6)
 
-        // Card Header Bar: Badge + Model + Actions
+        // Card Header Bar: Badge + Actions
         Row {
           width: parent.width
           spacing: Style.space(6)
@@ -300,7 +299,7 @@ Item {
             height: 1
           }
 
-          // Trailing Actions (Copy, Clear, Model)
+          // Trailing Actions (Copy, Clear)
           Row {
             id: cardActions
             spacing: Style.space(4)
@@ -353,55 +352,6 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: root.clearChat()
-              }
-            }
-
-            // Interactive Model Pill (Full Name)
-            Rectangle {
-              implicitWidth: modelRow.implicitWidth + Style.space(12)
-              implicitHeight: Style.space(20)
-              radius: Style.cornerRadius
-              color: modelPillMouse.containsMouse
-                ? Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.16)
-                : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.07)
-              border.width: 1
-              border.color: modelPillMouse.containsMouse
-                ? Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.35)
-                : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.10)
-
-              Behavior on color { ColorAnimation { duration: Style.duration(100) } }
-
-              Row {
-                id: modelRow
-                anchors.centerIn: parent
-                spacing: Style.space(4)
-
-                Text {
-                  id: modelLabel
-                  textFormat: Text.PlainText
-                  text: root.companionModelDisplayName
-                  color: modelPillMouse.containsMouse ? Commons.Color.accent : root.foreground
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption - 1
-                  font.bold: true
-                  anchors.verticalCenter: parent.verticalCenter
-                }
-
-                Text {
-                  textFormat: Text.PlainText
-                  text: "▾"
-                  color: modelPillMouse.containsMouse ? Commons.Color.accent : root.dim
-                  font.pixelSize: Style.font.caption - 2
-                  anchors.verticalCenter: parent.verticalCenter
-                }
-              }
-
-              MouseArea {
-                id: modelPillMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.openBrainSelectorRequested()
               }
             }
           }
