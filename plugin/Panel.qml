@@ -54,6 +54,30 @@ Panel {
   readonly property string companionName: String(setting("companionName", "Kian")).trim() || "Kian"
   readonly property string companionModel: activeCompanionModel
   readonly property string companionEffort: companionModel.endsWith("-high") ? "high" : (companionModel.endsWith("-low") ? "low" : "medium")
+  property bool tipBannerHovered: false
+
+  readonly property int totalTokensToday: {
+    var rev = usage ? usage.dataRevision : 0
+    var total = 0
+    var providers = usage ? usage.enabledProviders : []
+    for (var i = 0; i < providers.length; i++) {
+      total += Number(providers[i].todayTotalTokens || 0)
+    }
+    return total
+  }
+
+  readonly property int totalTokensWeek: {
+    var rev = usage ? usage.dataRevision : 0
+    var total = 0
+    var providers = usage ? usage.enabledProviders : []
+    for (var i = 0; i < providers.length; i++) {
+      var days = providers[i].recentDays || []
+      for (var d = 0; d < days.length; d++) {
+        total += Number(days[d].messageCount || 0)
+      }
+    }
+    return total
+  }
 
   function setCompanionModel(newModelId) {
     if (!newModelId) return
@@ -1212,8 +1236,8 @@ Panel {
   }
 
   Timer {
-    interval: 3800
-    running: root.opened && root.deepInsights.length > 1 && root.addStage === "" && !root.blankSlate
+    interval: 12000
+    running: root.opened && root.deepInsights.length > 1 && root.addStage === "" && !root.blankSlate && !root.tipBannerHovered
     repeat: true
     onTriggered: phraseSwap.restart()
   }
@@ -1372,6 +1396,7 @@ Panel {
               // Name + Brain Selector Row
               Row {
                 id: heroTitleRow
+                width: parent.width
                 spacing: Style.space(6)
 
                 Text {
@@ -1388,6 +1413,9 @@ Panel {
                 BrainSelector {
                   id: heroBrainSelector
                   anchors.verticalCenter: parent.verticalCenter
+                  maxWidth: (heroTitleRow.width > 0 && companionNameLabel.width > 0)
+                    ? Math.max(Style.space(40), heroTitleRow.width - companionNameLabel.width - heroTitleRow.spacing)
+                    : -1
                   modelId: root.companionModel
                   availableModels: root.availableModels
                   foreground: root.foreground
@@ -1404,9 +1432,17 @@ Panel {
               Text {
                 id: heroStatusText
                 textFormat: Text.PlainText
-                text: root.addStage !== ""
-                  ? root.addHeading.toUpperCase()
-                  : ((root.companionView && root.companionView.isThinking) ? "THINKING..." : "DESKTOP AI COMPANION")
+                text: {
+                  if (root.addStage !== "") return root.addHeading.toUpperCase()
+                  if (root.companionView && root.companionView.isThinking) return "THINKING..."
+                  if (root.totalTokensToday > 0) {
+                    return Commons.I18n.tn("agents.tokensToday", root.totalTokensToday).arg(usage.formatTokenCount(root.totalTokensToday)).toUpperCase()
+                  }
+                  if (root.totalTokensWeek > 0) {
+                    return Commons.I18n.tn("agents.tokensThisWeek", root.totalTokensWeek).arg(usage.formatTokenCount(root.totalTokensWeek)).toUpperCase()
+                  }
+                  return Commons.I18n.tn("agents.tokensToday", 0).arg(usage.formatTokenCount(0)).toUpperCase()
+                }
                 color: (root.companionView && root.companionView.isThinking)
                   ? Commons.Color.accent
                   : root.dim
@@ -1513,9 +1549,12 @@ Panel {
             }
 
             MouseArea {
+              id: tipBannerMouse
               anchors.fill: parent
               cursorShape: Qt.PointingHandCursor
               hoverEnabled: true
+              onEntered: root.tipBannerHovered = true
+              onExited: root.tipBannerHovered = false
               onClicked: root.showNextInsight()
             }
           }
