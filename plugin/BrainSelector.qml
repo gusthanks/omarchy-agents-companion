@@ -28,7 +28,7 @@ Item {
   property real maxWidth: -1
 
   readonly property real maxTextWidth: root.maxWidth > 0
-    ? Math.max(Style.space(20), root.maxWidth - arrowText.implicitWidth - Style.space(18))
+    ? Math.max(Style.space(20), root.maxWidth - arrowText.implicitWidth - Style.space(16) - pillRow.spacing)
     : -1
 
   signal modelSelected(string id, string label)
@@ -80,13 +80,6 @@ Item {
       spacing: Style.space(4)
 
       Text {
-        textFormat: Text.PlainText
-        text: "🧠"
-        font.pixelSize: Style.font.caption - 1
-        anchors.verticalCenter: parent.verticalCenter
-      }
-
-      Text {
         id: pillText
         textFormat: Text.PlainText
         text: root.currentLabel
@@ -94,10 +87,13 @@ Item {
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption - 1
         font.bold: true
+        elide: Text.ElideRight
+        width: root.maxTextWidth > 0 ? Math.min(implicitWidth, root.maxTextWidth) : implicitWidth
         anchors.verticalCenter: parent.verticalCenter
       }
 
       Text {
+        id: arrowText
         textFormat: Text.PlainText
         text: popup.opened ? "▴" : "▾"
         color: (pillMouse.containsMouse || popup.opened) ? root.accent : root.dim
