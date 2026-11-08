@@ -28,7 +28,7 @@ Item {
   property real maxWidth: -1
 
   readonly property real maxTextWidth: root.maxWidth > 0
-    ? Math.max(Style.space(20), root.maxWidth - arrowText.implicitWidth - Style.space(16) - pillRow.spacing)
+    ? Math.max(0, root.maxWidth - arrowText.implicitWidth - Style.space(16) - pillRow.spacing)
     : -1
 
   signal modelSelected(string id, string label)
@@ -55,6 +55,7 @@ Item {
   implicitHeight: pillRect.implicitHeight
   width: implicitWidth
   height: implicitHeight
+  visible: root.maxWidth < 0 || root.maxWidth >= Style.space(36)
 
   Rectangle {
     id: pillRect
@@ -63,6 +64,7 @@ Item {
     width: root.width
     height: implicitHeight
     radius: Style.cornerRadius
+    clip: true
     color: (pillMouse.containsMouse || popup.opened)
       ? Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.16)
       : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
@@ -88,7 +90,7 @@ Item {
         font.pixelSize: Style.font.caption - 1
         font.bold: true
         elide: Text.ElideRight
-        width: root.maxTextWidth > 0 ? Math.min(implicitWidth, root.maxTextWidth) : implicitWidth
+        width: root.maxWidth > 0 ? Math.min(implicitWidth, Math.max(0, root.maxTextWidth)) : implicitWidth
         anchors.verticalCenter: parent.verticalCenter
       }
 
@@ -115,6 +117,7 @@ Item {
     id: popup
     y: pillRect.height + Style.space(4)
     x: {
+      var _ = popup.opened
       var globalX = pillRect.mapToItem(null, 0, 0).x
       var winWidth = (root.Window && root.Window.window) ? root.Window.window.width : 380
       if (globalX + width > winWidth - 12) {
@@ -140,11 +143,15 @@ Item {
       width: parent.width
 
       // Popup Header
-      Row {
+      Item {
         width: parent.width
-        spacing: Style.space(6)
+        implicitHeight: Math.max(headerTitle.implicitHeight, brainCount.implicitHeight)
+        height: implicitHeight
 
         Text {
+          id: headerTitle
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
           textFormat: Text.PlainText
           text: "SWITCH BRAIN"
           color: root.dim
@@ -152,22 +159,17 @@ Item {
           font.pixelSize: Style.font.caption - 2
           font.bold: true
           font.letterSpacing: 1.1
-          anchors.verticalCenter: parent.verticalCenter
-        }
-
-        Item {
-          width: Math.max(0, parent.width - parent.children[0].width - brainCount.width - Style.space(6))
-          height: 1
         }
 
         Text {
           id: brainCount
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
           textFormat: Text.PlainText
           text: (root.availableModels ? root.availableModels.length : 0) + " available"
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption - 2
-          anchors.verticalCenter: parent.verticalCenter
         }
       }
 
