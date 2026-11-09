@@ -1477,20 +1477,17 @@ Panel {
           Item {
             id: hero
             width: parent.width
-            implicitHeight: heroTop.height + (tipLine.visible ? tipLine.height + Style.space(8) : 0)
+            implicitHeight: Math.max(heroAvatar.visible ? heroAvatar.implicitHeight : 0,
+                                     heroTop.height + (tipLine.visible ? tipLine.height + Style.space(8) : 0))
 
             property real metaOpacity: 1.0
-
-            Item {
-            id: heroTop
-            width: parent.width
-            height: Math.max(heroAvatar.visible ? heroAvatar.implicitHeight : 0, heroLabelsCol.implicitHeight, trailingButtons.implicitHeight)
 
             BlobAvatar {
               id: heroAvatar
               // While editing, only the pet being edited is shown.
               visible: !root.petEditing
               anchors.left: parent.left
+              // Centered on the whole hero (name, tokens and tip line).
               anchors.verticalCenter: parent.verticalCenter
               size: root.petHeroSize
               animated: root.opened
@@ -1505,10 +1502,15 @@ Panel {
               onReactionChanged: if (reaction === "") root.retryThinking(heroAvatar)
             }
 
+            Item {
+            id: heroTop
+            x: heroAvatar.visible ? heroAvatar.width + Style.space(12) : 0
+            width: parent.width - x
+            height: Math.max(heroLabelsCol.implicitHeight, trailingButtons.implicitHeight)
+
             Column {
               id: heroLabelsCol
-              anchors.left: heroAvatar.visible ? heroAvatar.right : parent.left
-              anchors.leftMargin: heroAvatar.visible ? Style.space(12) : 0
+              anchors.left: parent.left
               anchors.right: trailingButtons.left
               anchors.rightMargin: Style.space(8)
               anchors.verticalCenter: parent.verticalCenter
@@ -1599,7 +1601,7 @@ Panel {
               visible: root.addStage === "" && !root.blankSlate && !root.petEditing && !!root.currentInsight
               anchors.top: heroTop.bottom
               anchors.topMargin: Style.space(8)
-              x: heroLabelsCol.x
+              x: heroTop.x
               width: parent.width - x
               height: Math.max(tipText.implicitHeight, nextTip.height)
               opacity: hero.metaOpacity
