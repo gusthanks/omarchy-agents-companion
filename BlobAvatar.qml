@@ -110,7 +110,64 @@ Item {
     onTriggered: root.avatarState = "idle"
   }
 
+  // A pat: squish down, close the eyes happily and let a heart float up.
+  // A quick run of pats makes the pet hop.
+  property int patStreak: 0
+
+  SequentialAnimation {
+    id: patAnim
+    NumberAnimation { target: root; property: "squash"; to: 0.85; duration: 90; easing.type: Easing.OutQuad }
+    NumberAnimation { target: root; property: "squash"; to: -0.25; duration: 170; easing.type: Easing.OutBack }
+    NumberAnimation { target: root; property: "squash"; to: 0; duration: 140; easing.type: Easing.InOutQuad }
+  }
+
+  Timer { id: patStreakReset; interval: 1600; onTriggered: root.patStreak = 0 }
+
+  function pat() {
+    root.patStreak++
+    patStreakReset.restart()
+    root.avatarState = "happy"
+    happyReset.interval = 1200
+    happyReset.restart()
+    if (root.patStreak >= 4) {
+      root.patStreak = 0
+      happyAnim.restart()
+    } else {
+      patAnim.restart()
+    }
+    heartComp.createObject(root, { dx: (Math.random() - 0.5) * root.size * 0.5 })
+  }
+
+  Component {
+    id: heartComp
+
+    Text {
+      id: heart
+      property real dx: 0
+      textFormat: Text.PlainText
+      text: "♥"
+      color: root.baseColor
+      font.pixelSize: Math.max(8, root.size * 0.26)
+      x: root.width / 2 - width / 2 + dx
+      y: root.height * 0.05
+      z: 10
+
+      ParallelAnimation {
+        running: true
+        NumberAnimation { target: heart; property: "y"; to: -root.size * 0.45; duration: 950; easing.type: Easing.OutQuad }
+        NumberAnimation { target: heart; property: "dx"; to: heart.dx * 1.6; duration: 950 }
+        NumberAnimation { target: heart; property: "scale"; from: 0.6; to: 1.1; duration: 950 }
+        SequentialAnimation {
+          PauseAnimation { duration: 450 }
+          NumberAnimation { target: heart; property: "opacity"; to: 0; duration: 500; easing.type: Easing.InQuad }
+        }
+        onFinished: heart.destroy()
+      }
+    }
+  }
+
   function triggerHappy() {
+    happyReset.interval = 900
     root.avatarState = "happy"
     happyAnim.restart()
     happyReset.restart()
@@ -438,7 +495,7 @@ Item {
     }
     onExited: if (!root.trackGlobalCursor) { root.gazeX = 0; root.gazeY = 0 }
     onClicked: {
-      root.triggerHappy()
+      root.pat()
       root.clicked()
     }
   }

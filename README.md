@@ -10,11 +10,14 @@ you like.
 
 ## What you get
 
-- **A living pet**: a flat, theme-aware creature that breathes, blinks, and hops when
-  clicked. While the panel is open, its eyes follow your cursor anywhere on the screen.
-  It turns your theme's urgent color when a limit is close.
-- **One calm tip banner**: usage insights (tokens today, top model, session pace, limit
-  warnings). One line at a time, slow enough to read. Click the pet or the banner for the next one.
+- **A living pet**: a flat, theme-aware creature that breathes and blinks. While the panel
+  is open, its eyes follow your cursor anywhere on the screen. Click it to give it a pat:
+  it squishes, smiles and lets a heart float up (pat it a few times in a row and it hops).
+- **One calm tip banner**: live insights first (limits close to or at the cap with their
+  reset time, a quieter subscription to switch to, tokens today and per session, a nudge
+  late at night), then a pool of general tips for working with agents. The banner rotates
+  slowly and pauses while you hover it; the › button jumps to the next tip. English and
+  Brazilian Portuguese.
 - **A pet editor**: click the pencil in the panel header to sculpt it.
   - Body: blob, orb, squircle, drop, ghost
   - Eyes: capsule, dot, googly, pixel, sleepy

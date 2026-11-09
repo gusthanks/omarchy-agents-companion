@@ -77,31 +77,11 @@ Panel {
     return total
   }
 
-  readonly property bool currentInsightIsAlert: {
-    if (deepInsights && deepInsights.length > 0) {
-      var ins = deepInsights[deepInsightIndex % deepInsights.length]
-      return !!(ins && (ins.badge === "LIMIT ALERT" || ins.icon === "⚠️"))
-    }
-    return alarming
-  }
+  readonly property var currentInsight: deepInsights.length > 0 ? deepInsights[deepInsightIndex % deepInsights.length] : null
+  readonly property bool currentInsightIsAlert: !!(currentInsight && currentInsight.alert)
+  readonly property string currentInsightBadge: currentInsight ? currentInsight.badge : ""
+  readonly property string currentInsightIcon: currentInsight ? currentInsight.icon : ""
 
-  readonly property string currentInsightBadge: {
-    if (deepInsights && deepInsights.length > 0) {
-      var ins = deepInsights[deepInsightIndex % deepInsights.length]
-      return ins && ins.badge ? ins.badge : (currentInsightIsAlert ? "LIMIT ALERT" : "TIP")
-    }
-    return currentInsightIsAlert ? "LIMIT ALERT" : "TIP"
-  }
-
-  readonly property string currentInsightIcon: {
-    if (deepInsights && deepInsights.length > 0) {
-      var ins = deepInsights[deepInsightIndex % deepInsights.length]
-      return ins && ins.icon ? ins.icon : (currentInsightIsAlert ? "⚠️" : "💡")
-    }
-    return currentInsightIsAlert ? "⚠️" : "💡"
-  }
-
-  property string companionAvatarState: "idle"
   property int deepInsightIndex: 0
 
   readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
@@ -846,112 +826,82 @@ Panel {
     if (sessions > 0) phrases.push(Commons.I18n.tn("agents.sessionsToday", sessions).arg(Commons.I18n.formatNumber(sessions)))
     return phrases
   }
+  // Tips shown in the banner: live insights from usage first, then a
+  // rotating pool of general advice. Each entry: badge, icon, phrase, alert.
+  readonly property int staticTipCount: 14
+
   readonly property var deepInsights: {
+    var t = petStrings
     var list = []
+    var provs = root.providers || []
     var totalTokens = 0
-    var totalPrompts = 0
     var totalSessions = 0
     var byModel = {}
-    var nearLimitCount = 0
-    var worstLimit = null
+    var worst = null
+    var calmest = null
 
-    var provs = usage ? usage.enabledProviders : []
     for (var i = 0; i < provs.length; i++) {
       var p = provs[i]
-      var pTokens = Number(p.todayTotalTokens || 0)
-      var pPrompts = Number(p.todayPrompts || 0)
-      var pSessions = Number(p.todaySessions || 0)
-      totalTokens += pTokens
-      totalPrompts += pPrompts
-      totalSessions += pSessions
-
+      totalTokens += Number(p.todayTotalTokens || 0)
+      totalSessions += Number(p.todaySessions || 0)
       if (p.todayTokensByModel) {
-        for (var m in p.todayTokensByModel) {
-          byModel[m] = (byModel[m] || 0) + Number(p.todayTokensByModel[m] || 0)
-        }
+        for (var m in p.todayTokensByModel) byModel[m] = (byModel[m] || 0) + Number(p.todayTokensByModel[m] || 0)
       }
+      var wins = root.limitWindows(p)
+      var peak = -1
+      for (var w = 0; w < wins.length; w++) {
+        var pct = Number(wins[w].percent)
+        if (!(pct >= 0)) continue
+        peak = Math.max(peak, pct)
+        if (!worst || pct > worst.percent) worst = { provider: p.providerName || p.providerId || "", title: wins[w].title || "", percent: pct, resetMs: root.resetMsFor(wins[w]) }
+      }
+      if (peak >= 0 && (!calmest || peak < calmest.percent)) calmest = { provider: p.providerName || p.providerId || "", percent: peak }
+    }
 
-      var limits = p.limits || []
-      for (var l = 0; l < limits.length; l++) {
-        var lim = limits[l]
-        var pct = Number(lim.percent || 0)
-        if (pct >= 0.8) nearLimitCount++
-        if (!worstLimit || pct > worstLimit.percent) {
-          worstLimit = { provider: p.providerName || p.providerId || p.name || p.id || "Agent", label: lim.label || lim.title || "Limit", percent: pct, resetsAt: lim.resetsAt }
-        }
+    function pctText(v) { return Commons.I18n.formatNumber(Math.round(v * 100)) + "%" }
+
+    // Limits
+    if (worst && worst.percent >= 1) {
+      list.push({ badge: t.t("tip.badge.limit"), icon: "⚠️", alert: true,
+        phrase: (worst.resetMs > 0 ? t.t("tip.limitMaxed") : t.t("tip.limitMaxedNoReset"))
+          .arg(worst.provider).arg(worst.title).arg(root.formatDuration(worst.resetMs)) })
+    } else if (worst && worst.percent >= 0.9) {
+      list.push({ badge: t.t("tip.badge.limit"), icon: "⚠️", alert: true,
+        phrase: t.t("tip.limitNear").arg(worst.provider).arg(worst.title).arg(pctText(worst.percent)) })
+    } else if (worst) {
+      list.push({ badge: t.t("tip.badge.limits"), icon: "✓",
+        phrase: t.t("tip.limitsHealthy").arg(worst.provider).arg(worst.title).arg(pctText(worst.percent)) })
+    }
+    if (worst && worst.percent >= 0.9 && calmest && calmest.provider !== worst.provider && calmest.percent < 0.5) {
+      list.push({ badge: t.t("tip.badge.switch"), icon: "↻",
+        phrase: t.t("tip.switchProvider").arg(calmest.provider).arg(pctText(calmest.percent)) })
+    }
+
+    // Usage
+    if (totalTokens > 0 && usage && usage.formatTokenCount) {
+      var top = ""
+      for (var name in byModel) if (top === "" || byModel[name] > byModel[top]) top = name
+      list.push({ badge: t.t("tip.badge.today"), icon: "⚡",
+        phrase: top !== "" ? t.t("tip.tokensTodayTop").arg(usage.formatTokenCount(totalTokens)).arg(top)
+                           : t.t("tip.tokensToday").arg(usage.formatTokenCount(totalTokens)) })
+      if (totalSessions > 0) {
+        list.push({ badge: t.t("tip.badge.pace"), icon: "⏱️",
+          phrase: t.t("tip.pace").arg(usage.formatTokenCount(Math.round(totalTokens / totalSessions))).arg(Commons.I18n.formatNumber(totalSessions)) })
       }
     }
 
-    var topModel = ""
-    for (var modelName in byModel) {
-      if (topModel === "" || byModel[modelName] > byModel[topModel]) topModel = modelName
+    // Late night
+    var hour = new Date(root.nowMs).getHours()
+    if (hour >= 23 || hour < 5) list.push({ badge: t.t("tip.badge.night"), icon: "🌙", phrase: t.t("tip.lateNight") })
+
+    // General advice
+    for (var k = 1; k <= root.staticTipCount; k++) {
+      list.push({ badge: t.t("tip.badge.tip"), icon: "💡", phrase: t.t("tip.general." + k) })
     }
-
-    // 1. Burn Rate Analysis
-    if (totalTokens > 0) {
-      var mTokens = (totalTokens / 1000000).toFixed(1)
-      var phrase = mTokens + "M tokens burned today"
-      var desc = "Total consumption today is " + mTokens + "M tokens across " + totalSessions + " sessions" + (totalPrompts > 0 ? " and " + totalPrompts + " prompts." : ".")
-      if (topModel !== "") {
-        phrase += " · mostly " + topModel
-        desc += " Dominant model: " + topModel + "."
-      }
-      list.push({
-        badge: "BURN RATE",
-        icon: "⚡",
-        phrase: phrase,
-        details: desc
-      })
-    }
-
-    // 2. Limit & Quota Warnings
-    if (worstLimit && worstLimit.percent >= 0.8) {
-      var provName = worstLimit.provider || "Agent"
-      var pctStr = Math.round(worstLimit.percent * 100) + "%"
-      var phrase = "Alert: " + provName + " " + (worstLimit.label || "Limit") + " at " + pctStr
-      var desc = provName + " quota (" + (worstLimit.label || "Limit") + ") is nearing its limit at " + pctStr + ". Pace your queries or rotate providers."
-      list.push({
-        badge: "LIMIT ALERT",
-        icon: "⚠️",
-        phrase: phrase,
-        details: desc
-      })
-    } else if (worstLimit) {
-      var provName = worstLimit.provider || "Agent"
-      var pctStr = Math.round(worstLimit.percent * 100) + "%"
-      list.push({
-        badge: "LIMIT CHECK",
-        icon: "✓",
-        phrase: "Quotas healthy · Highest is " + provName + " (" + pctStr + ")",
-        details: "All provider limits are currently in safe ranges. Peak usage is " + provName + " " + (worstLimit.label || "Limit") + " at " + pctStr + "."
-      })
-    }
-
-    // 3. Token Pace & Efficiency
-    if (totalSessions > 0) {
-      var avgPerSession = usage.formatTokenCount(Math.round(totalTokens / Math.max(1, totalSessions)))
-      list.push({
-        badge: "SESSION PACE",
-        icon: "⏱️",
-        phrase: "Pace: ~" + avgPerSession + " tokens / session",
-        details: "Averaging ~" + avgPerSession + " tokens across " + totalSessions + " active sessions today."
-      })
-    }
-
-    // 4. Pro tips
-    list.push({
-      badge: "CACHE EFFICIENCY",
-      icon: "⚡",
-      phrase: "Tip: Keep sessions focused to maximize prompt cache hits",
-      details: "Antigravity prompt cache provides dramatic token savings when re-using context across turns."
-    })
-
     return list
   }
 
   function showNextInsight() {
-    companionAvatarState = "happy"
-    avatarHappyTimer.restart()
     if (deepInsights.length > 0) {
       deepInsightIndex = (deepInsightIndex + 1) % deepInsights.length
       var ins = deepInsights[deepInsightIndex]
@@ -959,12 +909,6 @@ Panel {
     }
   }
 
-  Timer {
-    id: avatarHappyTimer
-    interval: 850
-    repeat: false
-    onTriggered: companionAvatarState = "idle"
-  }
 
   property int phraseIndex: 0
   // Every record that lands rebuilds the phrases, and opening the panel
@@ -1278,10 +1222,8 @@ Panel {
               size: Style.space(54)
               foreground: root.foreground
               accentColor: Commons.Color.accent
-              avatarState: root.companionAvatarState
               look: root.petLook
               trackGlobalCursor: root.opened
-              onClicked: root.showNextInsight()
             }
 
             Column {
@@ -1394,7 +1336,13 @@ Panel {
               anchors.margins: Style.space(8)
               spacing: Style.space(4)
 
+              Item {
+                width: parent.width
+                height: Math.max(badgeRow.implicitHeight, nextTip.height)
+
               Row {
+                id: badgeRow
+                anchors.verticalCenter: parent.verticalCenter
                 spacing: Style.space(6)
 
                 Text {
@@ -1416,15 +1364,49 @@ Panel {
                 }
               }
 
+              Rectangle {
+                id: nextTip
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                visible: root.deepInsights.length > 1
+                width: Style.space(22)
+                height: Style.space(22)
+                radius: Style.cornerRadius
+                color: nextTipMouse.containsMouse
+                  ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.1)
+                  : "transparent"
+
+                Text {
+                  anchors.centerIn: parent
+                  textFormat: Text.PlainText
+                  text: "󰅂"
+                  color: nextTipMouse.containsMouse ? root.foreground : root.dim
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.body
+                }
+
+                MouseArea {
+                  id: nextTipMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.showNextInsight()
+                }
+
+                PanelToolTip {
+                  visible: nextTipMouse.containsMouse
+                  text: petStrings.t("tip.next")
+                }
+              }
+              }
+
               Text {
                 id: tipBannerText
                 textFormat: Text.PlainText
                 width: parent.width
                 // Read straight from the current insight so the badge and text
                 // can never drift apart when the insight list is rebuilt.
-                text: root.deepInsights.length > 0
-                  ? root.deepInsights[root.deepInsightIndex % root.deepInsights.length].phrase
-                  : root.heroPhrase
+                text: root.currentInsight ? root.currentInsight.phrase : root.heroPhrase
                 color: root.currentInsightIsAlert ? Commons.Color.urgent : root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body
@@ -1437,11 +1419,11 @@ Panel {
             MouseArea {
               id: tipBannerMouse
               anchors.fill: parent
-              cursorShape: Qt.PointingHandCursor
+              z: -1
               hoverEnabled: true
+              acceptedButtons: Qt.NoButton
               onEntered: root.tipBannerHovered = true
               onExited: root.tipBannerHovered = false
-              onClicked: root.showNextInsight()
             }
           }
 
