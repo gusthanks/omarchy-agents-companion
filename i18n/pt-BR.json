@@ -247,5 +247,8 @@
   "pet.opt.accessory.bow": "Laço",
   "pet.opt.accessory.flower": "Flor",
   "pet.opt.style.solid": "Sólido",
-  "pet.opt.style.outline": "Contorno"
+  "pet.opt.style.outline": "Contorno",
+  "pet.personality.livelyShort": "Reage a tudo",
+  "pet.personality.calmShort": "Sem manias à toa",
+  "pet.personality.stillShort": "Só poses"
 }

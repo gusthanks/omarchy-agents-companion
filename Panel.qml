@@ -1477,12 +1477,19 @@ Panel {
           Item {
             id: hero
             width: parent.width
-            implicitHeight: Math.max(heroAvatar.implicitHeight, heroLabelsCol.implicitHeight, trailingButtons.implicitHeight)
+            implicitHeight: heroTop.height + (tipLine.visible ? tipLine.height + Style.space(8) : 0)
 
             property real metaOpacity: 1.0
 
+            Item {
+            id: heroTop
+            width: parent.width
+            height: Math.max(heroAvatar.visible ? heroAvatar.implicitHeight : 0, heroLabelsCol.implicitHeight, trailingButtons.implicitHeight)
+
             BlobAvatar {
               id: heroAvatar
+              // While editing, only the pet being edited is shown.
+              visible: !root.petEditing
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
               size: root.petHeroSize
@@ -1500,8 +1507,8 @@ Panel {
 
             Column {
               id: heroLabelsCol
-              anchors.left: heroAvatar.right
-              anchors.leftMargin: Style.space(12)
+              anchors.left: heroAvatar.visible ? heroAvatar.right : parent.left
+              anchors.leftMargin: heroAvatar.visible ? Style.space(12) : 0
               anchors.right: trailingButtons.left
               anchors.rightMargin: Style.space(8)
               anchors.verticalCenter: parent.verticalCenter
@@ -1525,6 +1532,7 @@ Panel {
                 textFormat: Text.PlainText
                 text: {
                   if (root.addStage !== "") return root.addHeading.toUpperCase()
+                  if (root.petEditing) return petStrings.t("pet.edit", "Pet settings").toUpperCase()
                   if (!usage || !usage.formatTokenCount) return ""
                   if (root.totalTokensToday > 0) {
                     return petStrings.tn("agents.tokensToday", root.totalTokensToday).arg(usage.formatTokenCount(root.totalTokensToday)).toUpperCase()
@@ -1582,72 +1590,62 @@ Panel {
                 onClicked: root.launchAgent()
               }
             }
-          }
+            }
 
-          // ---------- Companion Tip & Alert Banner (Full width, multi-line) ----------
-          Rectangle {
-            id: tipBanner
-            visible: root.addStage === "" && !root.blankSlate && root.heroPhrase !== "" && !root.petEditing
-            width: parent.width
-            radius: Style.cornerRadius
-            color: root.currentInsightIsAlert
-              ? Qt.rgba(Commons.Color.urgent.r, Commons.Color.urgent.g, Commons.Color.urgent.b, 0.12)
-              : Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.08)
-            border.width: 1
-            border.color: root.currentInsightIsAlert
-              ? Qt.rgba(Commons.Color.urgent.r, Commons.Color.urgent.g, Commons.Color.urgent.b, 0.35)
-              : Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.20)
-            opacity: hero.metaOpacity
+            // ---------- Tip line: one line under the name; hover to read it whole ----------
+            Item {
+              id: tipLine
+              readonly property bool expanded: tipLineHover.hovered
+              visible: root.addStage === "" && !root.blankSlate && !root.petEditing && !!root.currentInsight
+              anchors.top: heroTop.bottom
+              anchors.topMargin: Style.space(8)
+              x: heroLabelsCol.x
+              width: parent.width - x
+              height: Math.max(tipText.implicitHeight, nextTip.height)
+              opacity: hero.metaOpacity
 
-            implicitHeight: tipBannerCol.implicitHeight + Style.space(16)
-            height: implicitHeight
+              HoverHandler {
+                id: tipLineHover
+                onHoveredChanged: root.tipBannerHovered = hovered
+              }
 
-            Behavior on color { ColorAnimation { duration: Style.duration(150) } }
-            Behavior on border.color { ColorAnimation { duration: Style.duration(150) } }
+              Text {
+                id: tipIcon
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.topMargin: Math.max(0, (nextTip.height - implicitHeight) / 2)
+                textFormat: Text.PlainText
+                text: root.currentInsightIcon
+                font.pixelSize: Style.font.caption
+              }
 
-            Column {
-              id: tipBannerCol
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.top: parent.top
-              anchors.margins: Style.space(8)
-              spacing: Style.space(4)
-
-              Item {
-                width: parent.width
-                height: Math.max(badgeRow.implicitHeight, nextTip.height)
-
-              Row {
-                id: badgeRow
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Style.space(6)
-
-                Text {
-                  textFormat: Text.PlainText
-                  text: root.currentInsightIcon
-                  font.pixelSize: Style.font.caption
-                  anchors.verticalCenter: parent.verticalCenter
-                }
-
-                Text {
-                  textFormat: Text.PlainText
-                  text: root.currentInsightBadge
-                  color: root.currentInsightIsAlert ? Commons.Color.urgent : Commons.Color.accent
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption - 1
-                  font.bold: true
-                  font.letterSpacing: 1.1
-                  anchors.verticalCenter: parent.verticalCenter
-                }
+              Text {
+                id: tipText
+                anchors.left: tipIcon.right
+                anchors.leftMargin: Style.space(6)
+                anchors.right: nextTip.left
+                anchors.rightMargin: Style.space(4)
+                anchors.top: parent.top
+                anchors.topMargin: tipLine.expanded ? 0 : Math.max(0, (nextTip.height - implicitHeight) / 2)
+                textFormat: Text.PlainText
+                text: root.currentInsight ? root.currentInsight.phrase : ""
+                color: root.currentInsightIsAlert ? Commons.Color.urgent : root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                font.weight: root.currentInsightIsAlert ? Font.DemiBold : Font.Normal
+                // One line until hovered, then the whole tip.
+                wrapMode: tipLine.expanded ? Text.WordWrap : Text.NoWrap
+                elide: tipLine.expanded ? Text.ElideNone : Text.ElideRight
+                maximumLineCount: tipLine.expanded ? 6 : 1
               }
 
               Rectangle {
                 id: nextTip
                 anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
+                anchors.top: parent.top
                 visible: root.deepInsights.length > 1
-                width: Style.space(22)
-                height: Style.space(22)
+                width: Style.space(20)
+                height: Style.space(20)
                 radius: Style.cornerRadius
                 color: nextTipMouse.containsMouse
                   ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.1)
@@ -1675,32 +1673,6 @@ Panel {
                   text: petStrings.t("tip.next")
                 }
               }
-              }
-
-              Text {
-                id: tipBannerText
-                textFormat: Text.PlainText
-                width: parent.width
-                // Read straight from the current insight so the badge and text
-                // can never drift apart when the insight list is rebuilt.
-                text: root.currentInsight ? root.currentInsight.phrase : root.heroPhrase
-                color: root.currentInsightIsAlert ? Commons.Color.urgent : root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.body
-                font.weight: root.currentInsightIsAlert ? Font.DemiBold : Font.Normal
-                wrapMode: Text.WordWrap
-                lineHeight: 1.25
-              }
-            }
-
-            MouseArea {
-              id: tipBannerMouse
-              anchors.fill: parent
-              z: -1
-              hoverEnabled: true
-              acceptedButtons: Qt.NoButton
-              onEntered: root.tipBannerHovered = true
-              onExited: root.tipBannerHovered = false
             }
           }
 

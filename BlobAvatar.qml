@@ -947,8 +947,9 @@ Item {
   // Where a framed chip looks, and how close: {x, y, z} in the same space as
   // cx / cy. Every chip zoom lives here.
   function frameFocus(framing, cx, cy, r) {
-    if (framing === "eyes") return { x: cx, y: cy - 0.08 * r, z: 1.5 }
-    if (framing === "mouth") return { x: cx, y: cy + 0.18 * r, z: 1.6 }
+    // Face chips show the whole body (no crop); the chip look already drops
+    // accessories and head extras so the eyes and mouth read clearly.
+    if (framing === "eyes" || framing === "mouth") return { x: cx, y: cy, z: 1.0 }
     if (framing === "top") return { x: cx, y: headTop(cy, r, 1) + 0.12 * r, z: 1.35 }
     if (framing === "topRight") return { x: cx + 0.42 * r, y: cy - 0.62 * r, z: 1.7 }
     if (framing === "topLeft") return { x: cx - 0.42 * r, y: cy - 0.62 * r, z: 1.7 }

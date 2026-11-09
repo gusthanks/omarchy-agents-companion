@@ -1070,21 +1070,93 @@ Item {
           title: strings.t("pet.personality", "PERSONALITY")
           value: strings.t("pet.personality." + root.petReactions, ({ lively: "Lively", calm: "Calm", still: "Still" })[root.petReactions])
         }
-        ButtonGroup {
+        // Three cards instead of a button group: the chosen one is filled with
+        // the accent, outlined and checked, so the selection reads at a glance.
+        Row {
+          id: personalityRow
+          width: parent.width
           spacing: Style.space(6)
-          focusable: false
-          fontSize: Style.font.bodySmall
-          fontFamily: root.fontFamily
-          foreground: root.foreground
-          value: root.petReactions
-          options: [
-            { value: "lively", label: strings.t("pet.personality.lively", "Lively"), tooltip: strings.t("pet.personality.livelyTip", "Reacts to everything, with little fidgets") },
-            { value: "calm", label: strings.t("pet.personality.calm", "Calm"), tooltip: strings.t("pet.personality.calmTip", "Reacts to you, no idle fidgets") },
-            { value: "still", label: strings.t("pet.personality.still", "Still"), tooltip: strings.t("pet.personality.stillTip", "Poses only, no animated reactions") }
-          ]
-          cursorIndex: root.keyTarget && root.keyTarget.kind === "pet.personality" ? root.keyTarget.index : -1
-          onChanged: function(v) { root.setReactions(v) }
-          onHovered: function(i, h) { if (h) root.pointRequested("pet.personality", i) }
+          // Every card gets room for the label plus two lines of hint, so the
+          // three always line up whatever the language.
+          readonly property real cardHeight: labelMetrics.height + 2 * hintMetrics.height + Style.space(2) + Style.space(16)
+          FontMetrics { id: labelMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
+          FontMetrics { id: hintMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.caption - 1 }
+          Repeater {
+            model: [
+              { value: "lively", glyph: "󱐋", label: strings.t("pet.personality.lively", "Lively"), hint: strings.t("pet.personality.livelyShort", "Reacts to everything"), tooltip: strings.t("pet.personality.livelyTip", "Reacts to everything, with little fidgets") },
+              { value: "calm", glyph: "󰖔", label: strings.t("pet.personality.calm", "Calm"), hint: strings.t("pet.personality.calmShort", "No idle fidgets"), tooltip: strings.t("pet.personality.calmTip", "Reacts to you, no idle fidgets") },
+              { value: "still", glyph: "󰏤", label: strings.t("pet.personality.still", "Still"), hint: strings.t("pet.personality.stillShort", "Poses only"), tooltip: strings.t("pet.personality.stillTip", "Poses only, no animated reactions") }
+            ]
+            Rectangle {
+              id: card
+              required property var modelData
+              required property int index
+              readonly property bool chosen: root.petReactions === modelData.value
+              readonly property bool cursor: root.isKey("pet.personality", index)
+              width: (personalityRow.width - 2 * personalityRow.spacing) / 3
+              height: personalityRow.cardHeight
+              radius: Style.cornerRadius
+              color: chosen
+                ? Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.2)
+                : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, (cardMouse.containsMouse || cursor) ? 0.08 : 0.03)
+              border.width: chosen ? 2 : 1
+              border.color: chosen ? root.accent : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, cursor ? 0.45 : 0.15)
+              Behavior on color { ColorAnimation { duration: Style.duration(120) } }
+
+              Text {
+                visible: card.chosen
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.margins: Style.space(5)
+                textFormat: Text.PlainText
+                text: "󰄬"
+                color: root.accent
+                font.pixelSize: Style.font.caption
+              }
+
+              Column {
+                id: cardCol
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Style.space(8)
+                spacing: Style.space(2)
+                Text {
+                  textFormat: Text.PlainText
+                  text: card.modelData.glyph + "  " + card.modelData.label
+                  color: card.chosen ? root.accent : root.foreground
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                  font.bold: card.chosen
+                }
+                Text {
+                  width: parent.width
+                  textFormat: Text.PlainText
+                  text: card.modelData.hint
+                  color: root.dim
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption - 1
+                  wrapMode: Text.WordWrap
+                  maximumLineCount: 2
+                  elide: Text.ElideRight
+                }
+              }
+
+              MouseArea {
+                id: cardMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onEntered: root.pointRequested("pet.personality", card.index)
+                onClicked: root.setReactions(card.modelData.value)
+              }
+
+              PanelToolTip {
+                visible: cardMouse.containsMouse
+                text: card.modelData.tooltip
+              }
+            }
+          }
         }
         Row {
           id: reactRow

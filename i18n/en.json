@@ -240,5 +240,8 @@
   "pet.opt.accessory.bow": "Bow",
   "pet.opt.accessory.flower": "Flower",
   "pet.opt.style.solid": "Solid",
-  "pet.opt.style.outline": "Outline"
+  "pet.opt.style.outline": "Outline",
+  "pet.personality.livelyShort": "Reacts to everything",
+  "pet.personality.calmShort": "No idle fidgets",
+  "pet.personality.stillShort": "Poses only"
 }
