@@ -158,6 +158,9 @@ Item {
     onTriggered: root.runUpdate(root.nearLimit ? "limits" : "normal")
   }
 
+  // True while omarchy-agent-usage-update runs (the pet "thinks" meanwhile).
+  readonly property bool updating: updateProcess.running
+
   Process {
     id: updateProcess
     running: false

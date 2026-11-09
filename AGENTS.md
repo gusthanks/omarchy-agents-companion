@@ -22,7 +22,7 @@ background layer (behind all windows, no focus) and save images straight to file
 ```bash
 dev/run.sh preview   # a window to play with the pet and its settings
 dev/run.sh face      # docs/pet.png    (the user's current pet, read-only)
-dev/run.sh sheet     # docs/sheet.png  (bodies, eyes, head, accessories, moods)
+dev/run.sh sheet     # docs/sheet.png  (bodies, eyes, head, accessories, moods, reactions)
 dev/run.sh editor    # docs/editor.png (pet settings)
 dev/run.sh gif       # docs/demo.gif   (scripted demo)
 dev/run.sh docs      # all of the above

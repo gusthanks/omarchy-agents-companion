@@ -12,7 +12,7 @@ import "pet" as Pet
 // MODE (env):
 //   preview  interactive floating window to play with the pet and its settings
 //   face     the user's current pet, large      -> $OUT (png)
-//   sheet    grid of bodies, eyes, accessories, moods -> $OUT (png)
+//   sheet    grid of bodies, eyes, accessories, moods, reactions -> $OUT (png)
 //   editor   the pet settings panel             -> $OUT (png)
 //   gif      scripted demo, one png per frame   -> $OUT/0000.png ... + $OUT/fps
 ShellRoot {
@@ -161,6 +161,41 @@ ShellRoot {
           }
         }
       }
+      // Reactions, frozen at their peak frame (PetClips poseAt), captioned.
+      Repeater {
+        model: [
+          { label: "reactions", names: ["yawn", "wake", "startle", "curious", "dizzy"] },
+          { label: "", names: ["wink", "sneeze", "thinking", "oof", "sigh"] }
+        ]
+        Row {
+          id: reactRow
+          required property var modelData
+          spacing: 8
+          Text { width: 84; y: 22; text: reactRow.modelData.label; color: shell.dim; font.family: Commons.Style.font.family; font.pixelSize: 13 }
+          Repeater {
+            model: reactRow.modelData.names
+            Column {
+              required property string modelData
+              spacing: 0
+              Pet.BlobAvatar {
+                size: 64
+                look: shell.petLook
+                themePalette: themeColors
+                posePreview: parent.modelData
+                interactive: false; animated: false; lively: false; seasonal: false
+              }
+              Text {
+                width: 64
+                horizontalAlignment: Text.AlignHCenter
+                text: parent.modelData
+                color: shell.dim
+                font.family: Commons.Style.font.family
+                font.pixelSize: 10
+              }
+            }
+          }
+        }
+      }
     }
   }
 
@@ -205,6 +240,11 @@ ShellRoot {
         interactive: false
         seasonal: false
         particleHost: scene
+        // Clips advance one fixed step per captured frame, however long a
+        // frame takes to save; no random fidgets or cursor reactions.
+        clock: function() { return scene.frame * scene.frameMs }
+        reactions: "calm"
+        cursorReactions: false
       }
 
       Text {
@@ -228,7 +268,10 @@ ShellRoot {
       property string caption: ""
 
       property int frame: 0
-      readonly property int total: 150
+      // Close to the real capture rate (~8-10 fps), so wall-clock animations
+      // (wobble, particles) keep about their speed in the GIF.
+      readonly property int frameMs: 100
+      readonly property int total: 280
       property real startMs: 0
 
       function moveCursor(t) {
@@ -239,17 +282,32 @@ ShellRoot {
         gifPet.lookAt(p.x, p.y)
       }
 
+      // The cursor rushes in from the corner toward the pet.
+      function rushCursor(t) {
+        cursor.x = 10 + (scene.width / 2 - 95 - 10) * t
+        cursor.y = 10 + (scene.height / 2 - 60 - 10) * t
+      }
+
       function step(f) {
         if (f < 40) { scene.caption = "follows your cursor"; cursor.visible = true; moveCursor(f / 40) }
         else if (f === 40) { cursor.visible = false; scene.caption = "pat it"; gifPet.pat() }
         else if (f === 48 || f === 56) gifPet.pat()
-        else if (f === 70) { scene.caption = "worried when a limit is close"; gifPet.mood = "worried" }
-        else if (f === 92) { scene.caption = "...and a party when it comes back"; gifPet.mood = "normal"; gifPet.celebrate() }
-        else if (f === 112) { scene.caption = "make it yours"; scene.look = withLook({ accessory: "hat" }) }
-        else if (f === 120) scene.look = withLook({ body: "ghost", accessory: "bow", color: "theme:magenta" })
-        else if (f === 128) scene.look = withLook({ body: "squircle", eyes: "pixel", extra: "ears", accessory: "none", color: "theme:blue" })
-        else if (f === 136) scene.look = withLook({ body: "drop", eyes: "googly", extra: "leaf", color: "theme:yellow" })
-        else if (f === 144) { scene.look = shell.petLook; scene.caption = "" }
+        else if (f === 68) { scene.caption = "worried when a limit is close"; gifPet.mood = "worried" }
+        else if (f === 84) { scene.caption = "...and a party when it comes back"; gifPet.mood = "normal"; gifPet.celebrate() }
+        else if (f === 104) { scene.caption = "thinks while your usage refreshes"; gifPet.play("thinking") }
+        else if (f === 126) gifPet.stop("thinking")
+        else if (f >= 130 && f <= 133) { scene.caption = "startled by a sudden cursor"; cursor.visible = true; rushCursor((f - 130) / 3)
+          if (f === 133) gifPet.play("startle") }
+        else if (f === 146) { cursor.visible = false; scene.caption = "too many pats make it dizzy" }
+        else if (f >= 148 && f <= 155) gifPet.pat()
+        else if (f === 182) { scene.caption = "a wink now and then"; gifPet.play("wink") }
+        else if (f === 194) { scene.caption = "yawns and dozes off"; gifPet.play("yawn", { next: "__sleep" }) }
+        else if (f === 228) { scene.caption = "a pat wakes it with a stretch"; gifPet.pat() }
+        else if (f === 246) { scene.caption = "make it yours"; scene.look = withLook({ accessory: "hat" }) }
+        else if (f === 253) scene.look = withLook({ body: "ghost", accessory: "bow", color: "theme:magenta" })
+        else if (f === 260) scene.look = withLook({ body: "squircle", eyes: "pixel", extra: "ears", accessory: "none", color: "theme:blue" })
+        else if (f === 267) scene.look = withLook({ body: "drop", eyes: "googly", extra: "leaf", color: "theme:yellow" })
+        else if (f === 274) { scene.look = shell.petLook; scene.caption = "" }
       }
 
       function withLook(patch) {
@@ -263,8 +321,11 @@ ShellRoot {
 
       function next() {
         if (scene.frame >= scene.total) {
-          var fps = scene.total / ((Date.now() - scene.startMs) / 1000)
-          fpsFile.setText(String(Math.round(fps * 10) / 10) + "\n")
+          // Clips run on the frame clock, so play back at its rate; the
+          // capture's own rate is logged to judge wall-clock animations.
+          var real = scene.total / ((Date.now() - scene.startMs) / 1000)
+          console.log("captured at " + (Math.round(real * 10) / 10) + " fps")
+          fpsFile.setText(String(Math.round(10000 / scene.frameMs) / 10) + "\n")
           Qt.callLater(Qt.quit)
           return
         }

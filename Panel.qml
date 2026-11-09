@@ -51,6 +51,8 @@ Panel {
   readonly property string petSize: ["s", "m", "l"].indexOf(petConfig.size) >= 0 ? petConfig.size : "m"
   readonly property real petHeroSize: Style.space(petSize === "s" ? 44 : (petSize === "l" ? 66 : 54))
   readonly property var petSaved: Array.isArray(petConfig.saved) ? petConfig.saved : []
+  // How lively the pet's reactions are: lively | calm | still.
+  readonly property string petReactions: ["lively", "calm", "still"].indexOf(petConfig.reactions) >= 0 ? petConfig.reactions : "lively"
   Commons.Translations { id: petStrings; directory: Qt.resolvedUrl("i18n") }
   ThemePalette { id: petPalette }
   property bool petEditing: false
@@ -58,6 +60,7 @@ Panel {
   // Merge a change into the pet config file and write it back.
   function writePet(patch) {
     var cfg = { name: petConfig.name || "", look: petLook, size: petSize, saved: petSaved }
+    if (petConfig.reactions !== undefined) cfg.reactions = petConfig.reactions
     for (var k in patch) cfg[k] = patch[k]
     petConfigFile.setText(JSON.stringify(cfg, null, 2) + "\n")
   }
@@ -96,22 +99,118 @@ Panel {
   }
   readonly property string petMood: allMaxed ? "tired" : (alarming ? "worried" : "normal")
 
-  // A subscription coming back from its cap is worth a little party.
+  // A subscription coming back from its cap is worth a little party; one
+  // newly hitting its cap gets an "oof".
   property var lastMaxed: []
+  // Providers that had a known limit below the cap last time, so a cap seen
+  // for the first time at startup doesn't count as "newly maxed".
+  property var lastUnderCap: []
+  property double lastCelebrateMs: 0
   onMaxedProvidersChanged: {
     var present = {}
-    for (var j = 0; j < providers.length; j++) present[providers[j].providerId || providers[j].providerName || String(j)] = true
+    var under = []
+    for (var j = 0; j < providers.length; j++) {
+      var id = providers[j].providerId || providers[j].providerName || String(j)
+      present[id] = true
+      var w = bindingWindow(providers[j])
+      if (w && w.percent < 1) under.push(id)
+    }
     var back = false
     for (var i = 0; i < lastMaxed.length; i++)
       if (maxedProviders.indexOf(lastMaxed[i]) < 0 && present[lastMaxed[i]]) back = true
+    var hit = false
+    for (var m = 0; m < maxedProviders.length; m++)
+      if (lastUnderCap.indexOf(maxedProviders[m]) >= 0) hit = true
     lastMaxed = maxedProviders
+    lastUnderCap = under
     if (back) petCelebrate()
+    else if (hit) petReact("oof")
   }
 
   function petCelebrate() {
+    lastCelebrateMs = Date.now()
     barPet.celebrate()
     var hero = panel.loadedContent ? panel.loadedContent.heroPet : null
     if (hero && root.opened) hero.celebrate()
+  }
+
+  // Play a reaction on the bar pet and, while the panel is open, the big one.
+  function petReact(name, opts) {
+    var ok = barPet.play(name, opts)
+    var hero = panel.loadedContent ? panel.loadedContent.heroPet : null
+    if (hero && root.opened) ok = hero.play(name, opts) || ok
+    return ok
+  }
+
+  // A sigh of relief when a limit stops being close without a party.
+  property string lastPetMood: "normal"
+  onPetMoodChanged: {
+    var was = lastPetMood
+    lastPetMood = petMood
+    if (was === "worried" && petMood === "normal") Qt.callLater(function() {
+      if (Date.now() - root.lastCelebrateMs > 3000) {
+        var hero = panel.loadedContent ? panel.loadedContent.heroPet : null
+        if (hero && root.opened) hero.play("sigh")
+      }
+    })
+  }
+
+  // The pet thinks while usage refreshes. Debounced so cached runs that
+  // finish at once don't flash; the bar pet only shows the pose.
+  property double thinkingSince: 0
+  Timer {
+    id: thinkingDebounce
+    interval: 400
+    onTriggered: if (usage.updating) root.petThink(true)
+  }
+  Connections {
+    target: usage
+    function onUpdatingChanged() {
+      if (usage.updating) thinkingDebounce.restart()
+      else { thinkingDebounce.stop(); root.petThink(false) }
+    }
+  }
+  function petThink(on) {
+    var hero = panel.loadedContent ? panel.loadedContent.heroPet : null
+    if (on) {
+      thinkingSince = Date.now()
+      barPet.play("thinking")
+      if (hero && root.opened) hero.play("thinking")
+    } else {
+      barPet.stop("thinking")
+      if (hero) hero.stop("thinking")
+    }
+  }
+  // Thinking is dropped while a stronger reaction plays; pick it up after.
+  function retryThinking(pet) {
+    if (usage.updating && root.opened && pet.reaction === "" && Date.now() - thinkingSince < 60000)
+      Qt.callLater(function() { if (usage.updating && pet.reaction === "") pet.play("thinking") })
+  }
+
+  // Forcing refreshes over and over kicks up dust.
+  property var refreshTimes: []
+  function countRefresh() {
+    var t = Date.now()
+    var list = refreshTimes.filter(function(x) { return t - x < 30000 })
+    list.push(t)
+    refreshTimes = list
+    if (list.length === 5) {
+      var hero = panel.loadedContent ? panel.loadedContent.heroPet : null
+      if (hero && root.opened) hero.play("sneeze", { priority: 2 })
+    }
+  }
+
+  // A wink the first time the panel opens each hour (and a hop on Mondays).
+  property string lastGreetHour: ""
+  Timer {
+    id: greetTimer
+    interval: 350
+    onTriggered: {
+      var hero = panel.loadedContent ? panel.loadedContent.heroPet : null
+      if (!hero || !root.opened) return
+      var d = new Date()
+      hero.play("wink", { priority: 2, next: d.getDay() === 1 ? "hop" : "" })
+    }
   }
   property bool tipBannerHovered: false
 
@@ -367,6 +466,7 @@ Panel {
   }
 
   function refreshNow() {
+    countRefresh()
     usage.refreshAll(true)
   }
 
@@ -1114,6 +1214,9 @@ Panel {
     if (panelFlick) panelFlick.contentY = 0
     usage.refreshLimits()
     Qt.callLater(function() { if (panel.loadedContent) panel.loadedContent.forceActiveFocus() })
+    var d = new Date()
+    var hour = d.toDateString() + " " + d.getHours()
+    if (hour !== lastGreetHour) { lastGreetHour = hour; greetTimer.restart() }
   } else {
     root.tipBannerHovered = false
     root.petEditing = false
@@ -1204,6 +1307,13 @@ Panel {
     function editPet(): void { root.open(); root.petEditing = true }
     function pat(): void { if (panel.loadedContent) panel.loadedContent.heroPet.pat() }
     function celebrate(): void { root.petCelebrate() }
+    // Play a pet reaction by name (manual testing; see PetClips.NAMES).
+    function react(name: string): string {
+      if (barPet.reactionNames.indexOf(name) < 0) return "unknown reaction; try: " + barPet.reactionNames.join(", ")
+      var hero = panel.loadedContent ? panel.loadedContent.heroPet : null
+      var ok = hero && root.opened ? hero.play(name, { force: true }) : barPet.play(name, { force: true })
+      return ok ? "ok" : "not shown (the bar pet only plays some reactions; open the panel)"
+    }
   }
 
   BarIconButton {
@@ -1236,6 +1346,11 @@ Panel {
     mood: root.petMood
     interactive: false
     animated: false
+    // Cheap in the bar: no blink or glance timers; reactions are a single
+    // repainted pose, except short "full" ones (celebrate, oof).
+    lively: false
+    reactionLevel: "cheap"
+    reactions: root.petReactions
     showMarks: false
     particles: false
   }
@@ -1331,6 +1446,8 @@ Panel {
               accentColor: Commons.Color.accent
               look: root.petLook
               trackGlobalCursor: root.opened
+              reactions: root.petReactions
+              onReactionChanged: if (reaction === "") root.retryThinking(heroAvatar)
             }
 
             Column {

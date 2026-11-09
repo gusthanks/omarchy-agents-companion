@@ -6,7 +6,7 @@ your AI-agent limits (Claude, Codex, Antigravity, …) and shares calm usage tip
 reshape it however you like.
 
 <p align="center"><img src="docs/pet.png" width="300" alt="Kian, a green round pet with glasses and an antenna"></p>
-<p align="center"><img src="docs/demo.gif" width="420" alt="The pet following the cursor, getting pats, worrying about a limit and celebrating"></p>
+<p align="center"><img src="docs/demo.gif" width="420" alt="The pet following the cursor, getting pats, worrying, celebrating, thinking, getting startled and dizzy, winking, dozing off and waking up"></p>
 
 > Built on top of Omarchy's stock **Agents** panel (MIT). Everything the stock panel does
 > (limits, pace, balances, multi-account) is still here. The pet sits on top.
@@ -17,8 +17,13 @@ reshape it however you like.
   your bar height.
 - **A living pet in the panel**: it breathes, blinks and, while the panel is open, follows
   your cursor anywhere on the screen. Click it to give it a pat: it squishes, smiles and lets
-  a heart float up (a few pats in a row and it hops). Leave the mouse still for a while and
-  it dozes off (sooner late at night); move or pat it to wake it.
+  a heart float up (a few pats in a row and it hops, too many make it dizzy). Leave the mouse
+  still for a while and it yawns and dozes off (sooner late at night); move or pat it and it
+  wakes with a stretch.
+- **Small reactions**: it thinks while your usage refreshes, gets startled when the cursor
+  rushes at it, tilts its head when the cursor rests nearby, winks hello, lets out an "oof"
+  when a subscription hits its cap and a sigh when a limit stops being close. Now and then
+  it sneezes or yawns. The bar pet only shows still poses, so it stays cheap.
 - **Moods from your limits**: worried (raised brows, a little "!") when a limit is close,
   tired ("z") when every subscription is maxed out, and a small confetti party when one
   comes back. Its color never changes; the limit bars still turn red as usual.
@@ -43,7 +48,7 @@ reshape it however you like.
 
   Changes apply live and are saved to `~/.config/omarchy/agents-pet.json`.
 
-<p align="center"><img src="docs/sheet.png" width="520" alt="Bodies, eyes, head extras, accessories and moods">&nbsp;<img src="docs/editor.png" width="260" alt="Pet settings"></p>
+<p align="center"><img src="docs/sheet.png" width="520" alt="Bodies, eyes, head extras, accessories, moods and reactions">&nbsp;<img src="docs/editor.png" width="260" alt="Pet settings"></p>
 
 The panel follows Omarchy's language setting: the stock panel strings ship in all 50
 Omarchy languages, and the pet's own strings in English and Brazilian Portuguese.
@@ -77,7 +82,8 @@ size-vertical = 32
 | Widget settings / `shell.json` → `refreshIntervalSec`, `sync*` | Same as the stock Agents panel |
 
 IPC (`omarchy-shell gusthx.agents-pet <method>`): `open`, `close`, `show`, `hide`, `toggle`,
-`refresh`, `nextInsight`, `editPet`, `pat`, `celebrate`.
+`refresh`, `nextInsight`, `editPet`, `pat`, `celebrate`, `react <name>` (pat, hop, celebrate,
+yawn, wake, startle, curious, dizzy, wink, sneeze, thinking, oof, sigh).
 
 ## Privacy
 
@@ -100,7 +106,10 @@ The repository root is the plugin folder, the layout `omarchy plugin add` expect
 ```
 manifest.json      plugin manifest (id gusthx.agents-pet)
 Panel.qml          bar button + panel, insights, moods, pet wiring
-BlobAvatar.qml     the pet (one Canvas, drawn from a "look" object)
+BlobAvatar.qml     the pet (one Canvas, drawn from a "look" object and a "face")
+PetFace.js         expression channels, named expressions, easing
+PetClips.js        reactions as data (steps, priorities, cooldowns)
+FacePlayer.qml     plays one reaction at a time over the mood / sleep pose
 PetEditor.qml      pet settings with live preview and saved pets
 ColorPicker.qml    saturation/value square + hue strip
 ThemePalette.qml   reads the current theme's named colors
