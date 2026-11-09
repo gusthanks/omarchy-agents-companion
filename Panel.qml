@@ -45,12 +45,67 @@ Panel {
 
   readonly property string companionName: String(petConfig.name || setting("companionName", "Kian")).trim() || "Kian"
   readonly property var petLook: petConfig.look || ({})
+  property var barPetLoaderRef: null
+  readonly property string petSize: ["s", "m", "l"].indexOf(petConfig.size) >= 0 ? petConfig.size : "m"
+  readonly property real petHeroSize: Style.space(petSize === "s" ? 44 : (petSize === "l" ? 66 : 54))
+  readonly property var petSaved: Array.isArray(petConfig.saved) ? petConfig.saved : []
   Commons.Translations { id: petStrings; directory: Qt.resolvedUrl("i18n") }
   property bool petEditing: false
 
-  function savePet(name, look) {
-    var cfg = { name: name, look: look }
+  // Merge a change into the pet config file and write it back.
+  function writePet(patch) {
+    var cfg = { name: petConfig.name || "", look: petLook, size: petSize, saved: petSaved }
+    for (var k in patch) cfg[k] = patch[k]
     petConfigFile.setText(JSON.stringify(cfg, null, 2) + "\n")
+  }
+
+  function savePetToInventory() {
+    var list = petSaved.slice()
+    list.push({ name: petConfig.name || "", look: petLook })
+    writePet({ saved: list.slice(-24) })
+  }
+
+  function wearSavedPet(i) {
+    var p = petSaved[i]
+    if (p) writePet({ name: p.name || "", look: p.look || ({}) })
+  }
+
+  function forgetSavedPet(i) {
+    var list = petSaved.slice()
+    list.splice(i, 1)
+    writePet({ saved: list })
+  }
+
+  // Mood follows the limits: worried when one is close (the same rule that
+  // turns the stock icon urgent), tired when every subscription is maxed out.
+  readonly property var maxedProviders: {
+    var out = []
+    for (var i = 0; i < providers.length; i++) {
+      var w = bindingWindow(providers[i])
+      if (w && w.percent >= 1) out.push(providers[i].providerId || providers[i].providerName || String(i))
+    }
+    return out
+  }
+  readonly property bool allMaxed: {
+    var withLimits = 0
+    for (var i = 0; i < providers.length; i++) if (bindingWindow(providers[i])) withLimits++
+    return withLimits > 0 && maxedProviders.length >= withLimits
+  }
+  readonly property string petMood: allMaxed ? "tired" : (alarming ? "worried" : "normal")
+
+  // A subscription coming back from its cap is worth a little party.
+  property var lastMaxed: []
+  onMaxedProvidersChanged: {
+    var back = false
+    for (var i = 0; i < lastMaxed.length; i++) if (maxedProviders.indexOf(lastMaxed[i]) < 0) back = true
+    lastMaxed = maxedProviders
+    if (back) petCelebrate()
+  }
+
+  function petCelebrate() {
+    if (barPetLoaderRef && barPetLoaderRef.item) barPetLoaderRef.item.celebrate()
+    var hero = panel.loadedContent ? panel.loadedContent.heroPet : null
+    if (hero && root.opened) hero.celebrate()
   }
   property bool tipBannerHovered: false
 
@@ -1123,14 +1178,35 @@ Panel {
     function refresh(): string { root.refreshNow(); return "ok" }
     function nextInsight(): string { root.showNextInsight(); return root.shownPhrase }
     function editPet(): void { root.open(); root.petEditing = true }
+    function pat(): void { if (panel.loadedContent) panel.loadedContent.heroPet.pat() }
+    function celebrate(): void { root.petCelebrate() }
   }
 
   BarIconButton {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: "󱚣"
-    active: root.alarming
+    iconComponent: Component {
+      Rectangle {
+        // A transparent box gives the bar's icon fitting a full-square bound.
+        color: "transparent"
+        width: Style.bar.iconCanvas
+        height: Style.bar.iconCanvas
+
+        Loader {
+          id: barPetLoader
+          anchors.fill: parent
+          Component.onCompleted: root.barPetLoaderRef = barPetLoader
+          sourceComponent: BlobAvatar {
+            size: Style.bar.iconCanvas
+            look: root.petLook
+            mood: root.petMood
+            interactive: false
+            animated: false
+          }
+        }
+      }
+    }
     onPressed: function(buttonCode) {
       if (buttonCode === Qt.RightButton) root.launchAgent()
       else if (buttonCode === Qt.MiddleButton) root.refreshNow()
@@ -1154,6 +1230,7 @@ Panel {
       property alias hero: hero
       property alias column: column
       property alias providerSections: providerSections
+      property alias heroPet: heroAvatar
       implicitHeight: column.implicitHeight
       anchors.fill: parent
       reorderable: root.addStage === "" && !root.renaming
@@ -1219,7 +1296,8 @@ Panel {
               id: heroAvatar
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
-              size: Style.space(54)
+              size: root.petHeroSize
+              mood: root.petMood
               foreground: root.foreground
               accentColor: Commons.Color.accent
               look: root.petLook
@@ -1281,7 +1359,7 @@ Panel {
 
               HeroButton {
                 visible: root.addStage === ""
-                glyph: root.petEditing ? "󰅖" : "󰏫"
+                glyph: root.petEditing ? "󰅖" : "󰒓"
                 tooltip: petStrings.t("pet.edit")
                 onClicked: root.petEditing = !root.petEditing
               }
@@ -1433,11 +1511,18 @@ Panel {
             width: parent.width
             look: root.petLook
             petName: root.petConfig.name || ""
+            petSize: root.petSize
+            saved: root.petSaved
             foreground: root.foreground
             dim: root.dim
             fontFamily: root.fontFamily
-            onLookEdited: function(look) { root.savePet(root.petConfig.name || "", look) }
-            onNameEdited: function(name) { if (name !== (root.petConfig.name || "")) root.savePet(name, root.petLook) }
+            onLookEdited: function(look) { root.writePet({ look: look }) }
+            onNameEdited: function(name) { if (name !== (root.petConfig.name || "")) root.writePet({ name: name }) }
+            onSizeEdited: function(size) { root.writePet({ size: size }) }
+            onSaveCurrent: root.savePetToInventory()
+            onWear: function(index) { root.wearSavedPet(index) }
+            onForget: function(index) { root.forgetSavedPet(index) }
+            onImported: function(name, look) { root.writePet({ name: name, look: look }) }
             onDone: root.petEditing = false
           }
 
@@ -1448,7 +1533,7 @@ Panel {
 
           Repeater {
             id: providerSections
-            model: root.addStage === "" ? root.providers : []
+            model: root.addStage === "" && !root.petEditing ? root.providers : []
 
             ProviderSection {
               required property var modelData
