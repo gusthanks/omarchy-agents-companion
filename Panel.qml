@@ -1505,6 +1505,8 @@ Panel {
             Item {
             id: heroTop
             x: heroAvatar.visible ? heroAvatar.width + Style.space(12) : 0
+            // Center the text block (labels + tip line) against the pet too.
+            y: Math.max(0, (hero.height - height - (tipLine.visible ? tipLine.height + Style.space(8) : 0)) / 2)
             width: parent.width - x
             height: Math.max(heroLabelsCol.implicitHeight, trailingButtons.implicitHeight)
 
