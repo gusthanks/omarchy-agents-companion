@@ -12,6 +12,8 @@
 #                               paths into a temp folder (never your config)
 #   dev/run.sh gif              render docs/demo.gif
 #   dev/run.sh docs             all of the above
+#   dev/run.sh check            compile every plugin type, Panel.qml included
+#                               (declared, never instantiated); run before deploy
 #
 # PET_FILE picks the pet to render (default: your own ~/.config/omarchy/agents-pet.json,
 # read only). Captures render offscreen (HEADLESS=1, the default), so nothing
@@ -77,6 +79,19 @@ case "${1:-preview}" in
   editor)  editor "${2:-${TAB:-}}" ;;
   png)     out="$cfg/out"; mkdir -p "$out"; render png "$out"; ls -la "$out"; echo "(files in $out)" ;;
   gif)     gif ;;
+  check)
+    # Compile-only: types are declared inside Components that never get created,
+    # so no window opens. Needs the Wayland backend (Panel uses PanelWindow).
+    files=$(cd "$repo" && ls *.qml | sed 's/\.qml$//')
+    { echo 'import QtQuick'; echo 'import Quickshell'; echo 'import "pet" as Pet'; echo 'ShellRoot {'
+      i=0; for f in $files; do echo "  Component { id: c$i; Pet.$f {} }"; i=$((i+1)); done
+      echo '  Component.onCompleted: {'
+      i=0; for f in $files; do echo "    console.warn(\"CHECK $f\", c$i.status === Component.Ready ? \"OK\" : c$i.errorString())"; i=$((i+1)); done
+      echo '  }'; echo '}'; } > "$cfg/shell.qml"
+    timeout 20 quickshell -n -p "$cfg/shell.qml" >"$cfg/check.log" 2>&1 || true
+    if grep -q 'Failed to load configuration' "$cfg/check.log"; then grep -E 'ERROR' "$cfg/check.log" >&2; exit 1; fi
+    grep -a 'CHECK ' "$cfg/check.log" | sed 's/^.*CHECK /CHECK /'
+    ! grep -a 'CHECK ' "$cfg/check.log" | grep -vq ' OK$' ;;
   docs)    "$0" face; "$0" sheet; "$0" chips; "$0" editor; "$0" gif ;;
   *) sed -n '2,20p' "$0"; exit 1 ;;
 esac

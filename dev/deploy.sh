@@ -9,6 +9,7 @@ live="${OMARCHY_PLUGIN_DIR:-$HOME/.config/omarchy/plugins}/$(jq -r .id "$repo/ma
 
 [[ -z $(git -C "$repo" status --porcelain) ]] || { echo "Commit your changes first (deploy installs HEAD)." >&2; exit 1; }
 omarchy plugin validate "$repo"
+"$repo/dev/run.sh" check >/dev/null || { "$repo/dev/run.sh" check; echo "QML does not compile; not deploying." >&2; exit 1; }
 
 if [[ -d $live/.git ]]; then
   git -C "$live" pull --ff-only -q "$repo" "$(git -C "$repo" branch --show-current)"

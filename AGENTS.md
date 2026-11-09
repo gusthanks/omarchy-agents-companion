@@ -30,6 +30,7 @@ dev/run.sh editor    # docs/editor-<tab>.png for shape face extras color saved, 
 dev/run.sh png       # Save PNG, backup / restore and editor key checks, in a temp folder
 dev/run.sh gif       # docs/demo.gif   (scripted demo)
 dev/run.sh docs      # all of the above
+dev/run.sh check     # compile every type, Panel.qml included (deploy runs this too)
 ```
 
 QML errors from the harness are printed by `dev/run.sh`; fix them before going further.
