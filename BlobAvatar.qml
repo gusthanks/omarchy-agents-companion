@@ -205,10 +205,13 @@ Item {
   // Particles live on the window's root item so the panel's scroll area does
   // not clip them at its top edge.
   readonly property Item windowRoot: root.Window.contentItem
+  // Where hearts and confetti are drawn; defaults to the window root. The dev
+  // harness points it at its capture stage so frames include them.
+  property Item particleHost: null
 
   function spawnParticle(glyph, dx, dy, color) {
     if (!root.particles) return
-    var host = root.windowRoot || root
+    var host = root.particleHost || root.windowRoot || root
     var origin = root.mapToItem(host, root.width / 2, root.height * 0.3)
     particleComp.createObject(host, { glyph: glyph, ox: origin.x, oy: origin.y, dx: dx, dy: dy, tint: color })
   }
