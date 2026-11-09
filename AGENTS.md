@@ -39,16 +39,19 @@ Also run `omarchy plugin validate .`.
 What the harness cannot render (the full bar panel with live usage data) is checked by the
 user after deploying, not by you on their live shell.
 
-## Deploy only at the end, and only when asked
+## Deploy once, at the end, and restart the bar
 
-When a change is finished, tested in the harness and committed:
+When ALL the requested work is finished, tested in the harness (`dev/run.sh check` and the
+captures) and committed:
 
 ```bash
-dev/deploy.sh   # fast-forwards the live plugin to this repo's HEAD
+dev/deploy.sh   # fast-forwards the live plugin to HEAD, then restarts the shell once
 ```
 
-The shell hot-reloads the plugin once. Only if new IPC methods don't appear does the user
-need `omarchy restart shell`. Never use `omarchy refresh shell` (it resets the bar layout).
+The shell's hot reload is not reliable for this plugin (the old version can stay on
+screen), so the deploy always ends with one `omarchy restart shell`. Do not tell the user
+something is done before this ran. Never use `omarchy refresh shell` (it resets the bar
+layout). Never deploy or restart in the middle of a task.
 
 ## Other conventions
 

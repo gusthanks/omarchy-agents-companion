@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install the committed state of this repo into the live Omarchy plugin.
-# Run this only when a change is finished and tested in the dev harness:
-# the live shell hot-reloads the plugin as soon as its files change.
+# Run this only when the work is finished and tested in the dev harness. It
+# restarts the shell once at the end so the new version actually shows.
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -18,4 +18,8 @@ else
   exit 1
 fi
 echo "Deployed $(git -C "$repo" log --oneline -1) to $live"
-echo "The shell reloads the plugin by itself. Only if new IPC methods don't show up: omarchy restart shell"
+# The shell's hot reload is not reliable for plugins (the old version can stay
+# on screen), so finish with one restart. Skip with NO_RESTART=1.
+if [[ ${NO_RESTART:-0} != 1 ]]; then
+  omarchy restart shell >/dev/null 2>&1 && echo "Shell restarted: the new version is live."
+fi
