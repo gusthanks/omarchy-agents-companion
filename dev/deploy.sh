@@ -21,5 +21,6 @@ echo "Deployed $(git -C "$repo" log --oneline -1) to $live"
 # The shell's hot reload is not reliable for plugins (the old version can stay
 # on screen), so finish with one restart. Skip with NO_RESTART=1.
 if [[ ${NO_RESTART:-0} != 1 ]]; then
-  omarchy restart shell >/dev/null 2>&1 && echo "Shell restarted: the new version is live."
+  omarchy restart shell >/dev/null 2>&1 || true
+  echo "Shell restarted: the new version is live."
 fi
