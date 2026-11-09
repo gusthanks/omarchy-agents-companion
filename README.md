@@ -28,37 +28,41 @@ reshape it however you like.
   tired ("z") when every subscription is maxed out, and a small confetti party when one
   comes back. Its color never changes; the limit bars still turn red as usual.
 - **Seasonal hats**: a Santa hat on Dec 24–25 and a party hat on Dec 31 / Jan 1.
-- **One calm tip banner**: live insights first (a limit near or at its cap with its reset
-  time, a quieter subscription to switch to, tokens today and per session, a late-night
-  nudge), then a pool of general tips for working with agents. It rotates slowly, pauses
-  while you hover it, and the › button jumps to the next tip.
-- **Pet settings**: click the gear in the panel header. A stage with the pet, its name and
-  its size in the bar (S / M / L) sit on top; five tabs below:
+- **One calm tip line** under the pet's name: live insights first (a limit near or at its
+  cap with its reset time, a quieter subscription to switch to, tokens today and per session,
+  a late-night nudge), then a pool of general tips for working with agents. It shows one
+  line; hover it to read the whole tip (rotation pauses meanwhile), and the › button jumps
+  to the next one. Limit alerts are shown in red.
+- **Pet settings** ("Pet Studio"): click the gear in the panel header. A stage with the
+  pet and a random (shuffle) button, its name and its size in the bar (S / M / L) sit on
+  top; five tabs below, and Undo / Reset / Done at the bottom:
   - **Shape**: body (blob, orb, squircle, drop, ghost) and style (solid or outline)
   - **Face**: eyes (capsule, dots, googly, pixel, sleepy), mouth (none, smile, surprised,
     cat, flat), blush cheeks, and the **personality**: Lively (every reaction and little
-    fidgets), Calm (reacts to you, no idle fidgets) or Still (poses only, no animation),
-    with buttons to try a few reactions on the stage
+    fidgets), Calm (reacts to you, no idle fidgets) or Still (poses only, no animated
+    reactions); a **Try** row plays Wink, Startle, Dizzy, Yawn and Party (celebrate) on the stage
   - **Extras**: head (antenna, leaf, ears, horns) and accessory (glasses, top hat, beanie,
     bow, flower)
   - **Color**: your current theme's colors (they follow theme switches), or any color from
     the custom picker / a hex code
   - **Saved**: keep the pets you make (up to 24) and wear them again in one click; copy /
     paste a pet as a short JSON code; **Back up all** writes the current pet, saved pets,
-    size and personality to `~/Documents/agents-pet-backup.json` (or `~/` when there is no
-    Documents folder) and **Restore** reads it back; **Save PNG** saves the pet as a
-    transparent 1024 px image in `~/Pictures/agents-pet-<name>.png`
+    size and personality to `agents-pet-backup.json` in your Documents folder (the XDG one,
+    usually `~/Documents`, or `~/` when there is none) and **Restore** reads it back with
+    the same checks as a pasted code; **Save PNG** saves the pet as a transparent 1024 px
+    image `agents-pet-<name>.png` in your Pictures folder (XDG, usually `~/Pictures`)
 
-  Pointing at an option tries it on the stage; a click commits it. 🎲 rolls a random look,
+  Pointing at an option tries it on the stage; a click commits it. The shuffle button rolls a random look,
   Reset goes back to the default, and Undo puts back the last random roll, reset, worn,
   removed, pasted or restored pet. The keyboard works too: arrows / hjkl move, Enter picks,
-  1-5 or [ ] switch tabs, r random, u undo, s save, c / v copy / paste a code, e edit the
-  name, x or Delete removes a saved pet, and Esc steps back (picker, then the editor, then
+  1-5 or [ ] switch tabs, r random, u (or Ctrl+Z) undo, s save, c / v copy / paste a code,
+  e edit the name, x, Delete or Backspace removes a saved pet, and Esc steps back (picker, then the editor, then
   the panel).
 
   Changes apply live and are saved to `~/.config/omarchy/agents-pet.json`.
 
-<p align="center"><img src="docs/sheet.png" width="520" alt="Bodies, eyes, head extras, accessories, moods and reactions">&nbsp;<img src="docs/editor.png" width="260" alt="Pet settings, Face tab: eye and mouth chips, blush cheeks and personality"></p>
+<p align="center"><img src="docs/sheet.png" width="520" alt="Bodies, eyes, head extras, accessories, moods and reactions">&nbsp;<img src="docs/editor.png" width="260" alt="Pet settings, Face tab: eye and mouth chips, blush cheeks, personality and the Try row"></p>
+<p align="center"><img src="docs/editor-shape.png" width="200" alt="Shape tab">&nbsp;<img src="docs/editor-extras.png" width="200" alt="Extras tab">&nbsp;<img src="docs/editor-color.png" width="200" alt="Color tab">&nbsp;<img src="docs/editor-saved.png" width="200" alt="Saved tab: saved pets, codes, backup and PNG"></p>
 
 The panel follows Omarchy's language setting: the stock panel strings ship in all 50
 Omarchy languages, and the pet's own strings in English and Brazilian Portuguese.
@@ -87,7 +91,7 @@ size-vertical = 32
 
 | Where | What |
 |---|---|
-| Gear button in the panel | Pet look, name, size and saved pets (`~/.config/omarchy/agents-pet.json`) |
+| Gear button in the panel | Pet look, name, size, personality and saved pets (`~/.config/omarchy/agents-pet.json`) |
 | Widget settings / `shell.json` → `companionName` | Fallback name when the settings haven't set one |
 | Widget settings / `shell.json` → `refreshIntervalSec`, `sync*` | Same as the stock Agents panel |
 
@@ -99,9 +103,13 @@ yawn, wake, startle, curious, dizzy, wink, sneeze, thinking, oof, sigh).
 
 The pet adds no network calls. What it touches:
 
-- `~/.config/omarchy/agents-pet.json` (your pet), and the clipboard only when you press
-  **Copy code** / **Paste code** (`wl-copy` / `wl-paste`). The code holds only the pet's name
-  and look; pasted codes are checked against the known options before use.
+- `~/.config/omarchy/agents-pet.json` (your pet, saved pets, size and personality).
+- The clipboard, only when you press **Copy code** / **Paste code** (`wl-copy` /
+  `wl-paste`). The code holds only the pet's name and look; pasted codes are checked
+  against the known options before use.
+- `agents-pet-backup.json` in your Documents folder, only when you press **Back up all**
+  (write) or **Restore** (read). Restored backups get the same checks as pasted codes.
+- `agents-pet-<name>.png` in your Pictures folder, only when you press **Save PNG**.
 
 Usage numbers come from Omarchy's own stock collectors (`omarchy-agent-usage-*`), the same
 ones the stock Agents panel runs. They read each agent's local credential files (for example
@@ -126,7 +134,7 @@ ColorPicker.qml    saturation/value square + hue strip
 ThemePalette.qml   reads the current theme's named colors
 Main.qml, Agent.qml, assets/   stock Agents plugin pieces
 i18n/              strings (stock panel strings in 50 languages, pet strings en + pt-BR)
-dev/               isolated harness (run.sh), deploy.sh
+dev/               isolated harness (run.sh, Harness.qml), deploy.sh
 docs/              images generated by dev/run.sh
 ```
 
@@ -142,9 +150,14 @@ dev/run.sh preview      # separate Quickshell instance with the pet and its sett
 dev/run.sh editor face  # docs/editor-face.png (any tab: shape face extras color saved)
 dev/run.sh png          # checks Save PNG, backup / restore and the editor's keys (temp folder)
 dev/run.sh docs         # regenerate the images in docs/
+dev/run.sh check        # compile every type, Panel.qml included
 git commit -am "..."    # then, when it is done:
 dev/deploy.sh           # fast-forward the installed plugin to HEAD
 ```
+
+## Changes
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## Credits
 
