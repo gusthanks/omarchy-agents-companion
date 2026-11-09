@@ -327,6 +327,20 @@ ShellRoot {
         onStatusChanged: if (status !== "") console.log("CHECK status: " + status)
       }
       FileView { id: junk; path: shell.out + "/junk.json"; printErrors: false }
+      // A Still pet on screen: every clip, even one the bar refuses, shows as
+      // a single pose when previewed.
+      Pet.BlobAvatar {
+        id: stillPet
+        x: 300; y: 120
+        size: 40
+        look: shell.petLook
+        themePalette: themeColors
+        interactive: false
+        seasonal: false
+        particles: false
+        reactions: "still"
+        cursorReactions: false
+      }
       property int step: 0
       Timer {
         running: true
@@ -354,6 +368,30 @@ ShellRoot {
             e.textKey("4", 0); e.activate({ kind: "pet.swatch", index: e.swatches.length }); console.log("CHECK custom -> picker " + e.pickerOpen)
             console.log("CHECK Esc closes picker " + e.back() + " then " + e.back())
             console.log("CHECK chipFrame bow=" + e.chipFrame("accessory", "bow") + " glasses=" + e.chipFrame("accessory", "glasses"))
+          }
+          else if (s === 8) {
+            var ed = fileEditor
+            // Undo covers only its own action: a pet saved after the dice stays.
+            ed.randomize(); ed.savePet()
+            console.log("CHECK undo after random+save keys=" + Object.keys(ed.lastSnapshot || {}).join(","))
+            ed.undo()
+            // Backspace on a saved card removes it (undoable).
+            ed.keyTarget = { kind: "pet.card", index: 1 }
+            ed.textKey("\b", 0)
+            console.log("CHECK backspace on card snapshot=" + Object.keys(ed.lastSnapshot || {}).join(","))
+            ed.keyTarget = null
+            // Chip looks stay the same object while style and color do.
+            console.log("CHECK chipLook memo " + (ed.chipLook("eyes", "dot") === ed.chipLook("eyes", "dot")))
+            var out = []
+            var names = ["wink", "startle", "dizzy", "yawn", "celebrate"]
+            for (var n = 0; n < names.length; n++) {
+              stillPet.stop("")
+              var ok = stillPet.play(names[n], { force: true })
+              out.push(names[n] + "=" + ok + "/" + stillPet.reaction)
+            }
+            console.log("CHECK still level=" + stillPet.effectiveLevel + " try " + out.join(" "))
+            stillPet.stop("")
+            console.log("CHECK still unforced startle=" + stillPet.play("startle") + " celebrate=" + stillPet.play("celebrate"))
           }
           else Qt.quit()
         }

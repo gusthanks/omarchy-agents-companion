@@ -10,6 +10,9 @@ import "PetClips.js" as PetClips
 //        cheap  (the bar pet) "pose" clips jump to their last pose with one
 //               repaint, "full" clips tick, "off" clips are refused, and
 //               base changes snap
+//        still  (the Still personality) every clip shows one pose: "pose"
+//               clips their last, the others their peak; "off" clips only
+//               with force (previews); base changes snap
 //        static nothing plays; base changes snap
 QtObject {
   id: p
@@ -56,7 +59,8 @@ QtObject {
     var t = now()
     var force = !!(opts && opts.force)
     var prio = opts && opts.priority !== undefined ? opts.priority : c.priority
-    if (p.level === "cheap" && (c.bar || "off") === "off") return false
+    var posesOnly = p.level === "still" || p.level === "cheap" && c.bar === "pose"
+    if ((c.bar || "off") === "off" && (p.level === "cheap" || p.level === "still" && !force)) return false
     if (!force && !(opts && opts.noCooldown) && c.cooldown && p._lastPlayed[name] !== undefined
         && t - p._lastPlayed[name] < c.cooldown) return false
     if (!force) {
@@ -68,16 +72,18 @@ QtObject {
       }
     }
     p._lastPlayed[name] = t
+    // A pose clip's revert timer must not cut off whatever replaces it.
+    poseTimer.stop()
     p._clip = c
     p.current = name
     p.currentPriority = prio
     p._next = opts && opts.next !== undefined ? opts.next : (c.next || "")
     p._keys = PetClips.keyframes(c, p.basePose, opts)
-    if (p.level === "cheap" && c.bar === "pose") {
+    if (posesOnly) {
       p.running = false
-      p._setFace(p._keys[p._keys.length - 1])
+      p._setFace(c.bar === "pose" ? p._keys[p._keys.length - 1] : PetClips.peakPose(name, p.basePose, opts))
       // A loop holds its pose until stopped; a one-shot reverts on its own.
-      poseTimer.interval = c.mode === "once" ? 1200 : (c.maxMs || 60000)
+      poseTimer.interval = c.mode === "once" || c.loops > 0 ? 1200 : (c.maxMs || 60000)
       poseTimer.restart()
       return true
     }

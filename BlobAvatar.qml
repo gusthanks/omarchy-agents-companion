@@ -142,12 +142,12 @@ Item {
 
   // How lively reactions are (a user setting): lively = everything, calm = no
   // ambient fidgets (yawns, sneezes, idle winks), still = no animated clips
-  // (poses only).
+  // (every clip shows one pose, also on the bar pet).
   property string reactions: "lively"
   // What this avatar can afford: full (ticks clips), cheap (the bar: poses,
   // short "full" clips only), static (swatches: nothing plays).
   property string reactionLevel: root.animated ? "full" : (root.lively ? "cheap" : "static")
-  readonly property string effectiveLevel: root.reactions === "still" && root.reactionLevel === "full" ? "cheap" : root.reactionLevel
+  readonly property string effectiveLevel: root.reactions === "still" && root.reactionLevel !== "static" ? "still" : root.reactionLevel
   // Cursor-driven reactions (startle, curious). The GIF harness turns them off.
   property bool cursorReactions: true
   // Harness: function() -> ms used instead of the wall clock for clips.
@@ -429,8 +429,9 @@ Item {
     lastLookX = sceneX
     lastLookY = sceneY
     idleTimer.restart()
-    // Moving the pointer during the doze-off yawn keeps the pet awake.
-    if (player.current === "yawn") root.stop("yawn")
+    // Moving the pointer during the doze-off yawn keeps the pet awake (a
+    // previewed yawn plays on).
+    if (player.current === "yawn" && player._next === "__sleep") root.stop("yawn")
     if (root.asleep) {
       if (!root.play("wake")) {
         root.asleep = false

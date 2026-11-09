@@ -51,7 +51,19 @@ Panel {
   readonly property real barPetSize: Math.round(Style.bar.sizeHorizontal * (petSize === "s" ? 0.7 : (petSize === "l" ? 0.96 : 0.85)))
   readonly property string petSize: ["s", "m", "l"].indexOf(petConfig.size) >= 0 ? petConfig.size : "m"
   readonly property real petHeroSize: Style.space(petSize === "s" ? 44 : (petSize === "l" ? 66 : 54))
-  readonly property var petSaved: Array.isArray(petConfig.saved) ? petConfig.saved : []
+  // Replaced only when the list really changes: every config write parses a
+  // new array, and a new one would rebuild every saved-pet card in the editor.
+  property var petSaved: []
+  property string petSavedJson: "[]"
+  function syncPetSaved() {
+    var list = Array.isArray(petConfig.saved) ? petConfig.saved : []
+    var json = JSON.stringify(list)
+    if (json === petSavedJson) return
+    petSavedJson = json
+    petSaved = list
+  }
+  onPetConfigChanged: syncPetSaved()
+  Component.onCompleted: syncPetSaved()
   // How lively the pet's reactions are: lively | calm | still.
   readonly property string petReactions: ["lively", "calm", "still"].indexOf(petConfig.reactions) >= 0 ? petConfig.reactions : "lively"
   Commons.Translations { id: petStrings; directory: Qt.resolvedUrl("i18n") }

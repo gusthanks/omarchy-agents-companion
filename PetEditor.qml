@@ -32,7 +32,8 @@ Item {
   property var keyTarget: null
   property int tab: 0
 
-  // Where backups and PNGs go. Empty: ~/Documents (or ~) and ~/Pictures.
+  // Where backups and PNGs go. Empty: the XDG Documents folder (or ~) and
+  // the XDG Pictures folder.
   // The dev harness points these at a temp folder.
   property string backupPath: ""
   property string pngDir: ""
@@ -156,14 +157,24 @@ Item {
     return root.hexOf(Qt.rgba(b.r + (f.r - b.r) * 0.45, b.g + (f.g - b.g) * 0.45, b.b + (f.b - b.b) * 0.45, 1))
   }
 
+  // A chip only depends on its trait, the style and the color. The same
+  // object comes back while those stay put, so editing another trait doesn't
+  // repaint every chip (a new object would). Plain JS cache: no notifications.
+  property var chipCache: ({})
   function chipLook(key, val) {
     if (key === "style") return root.withTrait("style", val)
-    var l = { body: "orb", eyes: "dot", mouth: "none", extra: "none", accessory: "none", cheeks: false,
-              style: root.value("style"), color: root.value("color") }
-    l[key] = val
+    var color = root.value("color")
     if (key === "accessory" && val !== "none" && val !== "glasses"
         && Math.abs(root.luma(root.currentColor) - root.luma(root.foreground)) < 0.25)
-      l.color = root.neutralColor
+      color = root.neutralColor
+    var id = key + "|" + val + "|" + root.value("style") + "|" + color
+    var cache = root.chipCache
+    if (cache[id]) return cache[id]
+    var l = { body: "orb", eyes: "dot", mouth: "none", extra: "none", accessory: "none", cheeks: false,
+              style: root.value("style"), color: color }
+    l[key] = val
+    if (Object.keys(cache).length > 300) for (var k in cache) delete cache[k]
+    cache[id] = l
     return l
   }
 
@@ -224,22 +235,48 @@ Item {
   function tildePath(p) {
     return root.home !== "" && p.indexOf(root.home + "/") === 0 ? "~" + p.slice(root.home.length) : p
   }
+  // The status line is narrow: file messages name the folder or the file,
+  // not the whole path.
+  function folderOf(p) {
+    var t = root.tildePath(p), i = t.lastIndexOf("/")
+    return i > 0 ? t.slice(0, i) : t
+  }
+  function fileOf(p) { return String(p).slice(String(p).lastIndexOf("/") + 1) }
 
   // ------------------------------------------------------------ edits
   function commit(key, val) {
+    root.touch("look")
     root.tryOn = null
     root.lookEdited(root.withTrait(key, val))
     preview.triggerHappy()
   }
 
-  function snapshot() {
-    root.lastSnapshot = {
+  // Undo covers one action: the snapshot keeps only the keys it changes, and
+  // a later edit of any of those keys drops it (so undo can't revert that
+  // edit, or a pet saved since, along with it).
+  function snapshot(keys) {
+    var all = {
       name: root.petName,
       look: root.withTrait("color", root.value("color")),
       saved: root.saved.slice(),
       size: root.petSize,
       reactions: root.petReactions
     }
+    var s = {}
+    keys = keys || ["name", "look", "saved", "size", "reactions"]
+    for (var i = 0; i < keys.length; i++) s[keys[i]] = all[keys[i]]
+    root.lastSnapshot = s
+  }
+  function touch(key) {
+    if (root.lastSnapshot && root.lastSnapshot[key] !== undefined) root.lastSnapshot = null
+  }
+  function editName(n) {
+    if (n !== root.petName) root.touch("name")
+    root.nameEdited(n)
+  }
+  function editSize(v) {
+    root.touch("size")
+    root.sizeEdited(v)
   }
 
   function undo() {
@@ -252,7 +289,7 @@ Item {
   }
 
   function randomize() {
-    root.snapshot()
+    root.snapshot(["look"])
     var next = {}
     for (var i = 0; i < root.traits.length; i++) {
       var t = root.traits[i]
@@ -266,7 +303,7 @@ Item {
   }
 
   function resetLook() {
-    root.snapshot()
+    root.snapshot(["look"])
     root.tryOn = null
     root.lookEdited(root.defaults)
     preview.triggerHappy()
@@ -275,7 +312,8 @@ Item {
 
   function savePet() {
     if (root.savedFull) { root.say(strings.t("pet.full", "Up to 24 pets"), "error"); return }
-    root.nameEdited(nameField.text.trim())
+    root.editName(nameField.text.trim())
+    root.touch("saved")
     root.saveCurrent()
     badgeBump.restart()
     root.say(strings.t("pet.saved", "Saved"))
@@ -288,7 +326,7 @@ Item {
 
   function wearCard(i) {
     if (!root.saved[i]) return
-    root.snapshot()
+    root.snapshot(["name", "look"])
     root.wear(i)
     preview.triggerHappy()
     root.say(strings.t("pet.worn", "Wearing %1 · u to undo").replace("%1", root.savedName(i)), "ok", true)
@@ -297,7 +335,7 @@ Item {
   function forgetCard(i) {
     if (!root.saved[i]) return
     var name = root.savedName(i)
-    root.snapshot()
+    root.snapshot(["saved"])
     root.forget(i)
     root.say(strings.t("pet.forgotten", "Removed %1 · u to undo").replace("%1", name), "ok", true)
   }
@@ -311,6 +349,7 @@ Item {
 
   function setReactions(v) {
     if (["lively", "calm", "still"].indexOf(v) < 0 || v === root.petReactions) return
+    root.touch("reactions")
     root.reactionsEdited(v)
     preview.triggerHappy()
   }
@@ -340,7 +379,7 @@ Item {
     try {
       var data = JSON.parse(String(text || "").trim())
       if (!data || data.agentsPet !== 1 || typeof data.look !== "object") throw "bad"
-      root.snapshot()
+      root.snapshot(["name", "look"])
       root.imported(String(data.name || "").slice(0, 24), root.sanitize(data.look))
       preview.triggerHappy()
       root.say(strings.t("pet.importedUndo", "Pet imported · u to undo"), "ok", true)
@@ -384,6 +423,9 @@ Item {
     return out
   }
 
+  // The user's Documents folder (XDG, so localized names work), or ~.
+  readonly property string docsDirSh: 'd=$(xdg-user-dir DOCUMENTS 2>/dev/null); [ -n "$d" ] && [ "$d" != "$HOME" ] || d="$HOME/Documents"; [ -d "$d" ] || d="$HOME"; '
+
   property string fileMode: ""  // export | import
   Process {
     id: fileProc
@@ -394,10 +436,10 @@ Item {
 
   function exportBackup() {
     if (fileProc.running) return
-    root.nameEdited(nameField.text.trim())
+    root.editName(nameField.text.trim())
     root.fileMode = "export"
     fileProc.command = ["sh", "-c",
-      'f="$2"; if [ -z "$f" ]; then d="$HOME/Documents"; [ -d "$d" ] || d="$HOME"; f="$d/agents-pet-backup.json"; fi; '
+      'f="$2"; if [ -z "$f" ]; then ' + root.docsDirSh + 'f="$d/agents-pet-backup.json"; fi; '
       + 'mkdir -p "$(dirname "$f")" && printf "%s" "$1" > "$f" && printf "OK\\t%s" "$f" || printf "FAIL\\t%s" "$f"',
       "sh", JSON.stringify(root.backupData(), null, 2) + "\n", root.backupPath]
     fileProc.running = true
@@ -407,7 +449,7 @@ Item {
     if (fileProc.running) return
     root.fileMode = "import"
     fileProc.command = ["sh", "-c",
-      'f="$1"; if [ -z "$f" ]; then f="$HOME/Documents/agents-pet-backup.json"; [ -f "$f" ] || [ ! -f "$HOME/agents-pet-backup.json" ] || f="$HOME/agents-pet-backup.json"; fi; '
+      'f="$1"; if [ -z "$f" ]; then ' + root.docsDirSh + 'f="$d/agents-pet-backup.json"; [ -f "$f" ] || [ ! -f "$HOME/agents-pet-backup.json" ] || f="$HOME/agents-pet-backup.json"; fi; '
       + 'if [ -f "$f" ]; then printf "OK\\t%s\\n" "$f"; head -c 262144 "$f"; else printf "MISSING\\t%s\\n" "$f"; fi',
       "sh", root.backupPath]
     fileProc.running = true
@@ -417,22 +459,23 @@ Item {
     var out = String(text || "")
     var nl = out.indexOf("\n")
     var head = (nl >= 0 ? out.slice(0, nl) : out).split("\t")
-    var path = root.tildePath(head[1] || "")
+    var full = head[1] || ""
+    var folder = root.folderOf(full)
     if (root.fileMode === "export") {
-      if (head[0] === "OK") root.say(strings.t("pet.backupSaved", "Backup saved to %1").replace("%1", path), "ok", true)
-      else root.say(strings.t("pet.backupFailed", "Couldn't write %1").replace("%1", path), "error")
+      if (head[0] === "OK") root.say(strings.t("pet.backupSaved", "Backup saved in %1").replace("%1", folder), "ok", true)
+      else root.say(strings.t("pet.backupFailed", "Couldn't write to %1").replace("%1", folder), "error")
       console.log("BACKUP export " + head[0] + " " + (head[1] || ""))
       return
     }
     if (head[0] !== "OK") {
-      root.say(strings.t("pet.backupMissing", "No backup at %1").replace("%1", path), "error")
+      root.say(strings.t("pet.backupMissing", "No backup in %1").replace("%1", folder), "error")
       console.log("BACKUP import missing " + (head[1] || ""))
       return
     }
     var clean = null
     try { clean = root.sanitizeBackup(JSON.parse(out.slice(nl + 1))) } catch (e) { clean = null }
     if (!clean) {
-      root.say(strings.t("pet.backupInvalid", "Not a pet backup: %1").replace("%1", path), "error")
+      root.say(strings.t("pet.backupInvalid", "Not a pet backup: %1").replace("%1", root.fileOf(full)), "error")
       console.log("BACKUP import invalid " + (head[1] || ""))
       return
     }
@@ -440,7 +483,7 @@ Item {
     root.tryOn = null
     root.restore(clean)
     preview.triggerHappy()
-    root.say(strings.t("pet.backupRestored", "Restored from %1 · u to undo").replace("%1", path), "ok", true)
+    root.say(strings.t("pet.backupRestored", "Backup restored · u to undo"), "ok", true)
     console.log("BACKUP import ok " + JSON.stringify(clean))
   }
 
@@ -453,23 +496,32 @@ Item {
   }
   function exportPng() {
     if (mkdirProc.running || pngShot.active) return
-    var dir = root.pngDir !== "" ? root.pngDir : root.home + "/Pictures"
-    root.pngPath = dir + "/agents-pet-" + (root.slug(nameField.text.trim() || root.petName) || "pet") + ".png"
-    mkdirProc.command = ["mkdir", "-p", dir]
+    root.pngName = "agents-pet-" + (root.slug(nameField.text.trim() || root.petName) || "pet") + ".png"
+    root.pngPath = root.pngName
+    // The user's Pictures folder (XDG, so localized names work), created if needed.
+    mkdirProc.command = ["sh", "-c",
+      'd="$1"; if [ -z "$d" ]; then d=$(xdg-user-dir PICTURES 2>/dev/null); [ -n "$d" ] && [ "$d" != "$HOME" ] || d="$HOME/Pictures"; fi; '
+      + 'mkdir -p "$d" && printf "%s" "$d"', "sh", root.pngDir]
     mkdirProc.running = true
   }
+  property string pngName: ""
   Process {
     id: mkdirProc
-    onExited: function(code) {
-      if (code === 0) pngShot.active = true
-      else root.say(strings.t("pet.pngFailed", "Couldn't save %1").replace("%1", root.tildePath(root.pngPath)), "error")
+    // Prints the folder only when it exists (or was just made).
+    stdout: StdioCollector {
+      onStreamFinished: {
+        if (text !== "") {
+          root.pngPath = text + "/" + root.pngName
+          pngShot.active = true
+        } else root.say(strings.t("pet.pngFailed", "Couldn't save %1").replace("%1", root.pngName), "error")
+      }
     }
   }
   function pngGrabbed(ok) {
     pngShot.active = false
     console.log("PNG " + (ok ? "ok " : "fail ") + root.pngPath)
-    if (ok) root.say(strings.t("pet.pngSaved", "Saved %1").replace("%1", root.tildePath(root.pngPath)), "ok", true)
-    else root.say(strings.t("pet.pngFailed", "Couldn't save %1").replace("%1", root.tildePath(root.pngPath)), "error")
+    if (ok) root.say(strings.t("pet.pngSaved", "PNG saved in %1").replace("%1", root.folderOf(root.pngPath)), "ok", true)
+    else root.say(strings.t("pet.pngFailed", "Couldn't save %1").replace("%1", root.pngName), "error")
   }
 
   Item {
@@ -500,7 +552,9 @@ Item {
         Timer {
           running: true
           interval: 350
-          onTriggered: shot.grabToImage(function(r) { root.pngGrabbed(r.saveToFile(root.pngPath)) }, Qt.size(1024, 1024))
+          // False (and no callback) when the editor was hidden meanwhile.
+          onTriggered: if (!shot.grabToImage(function(r) { root.pngGrabbed(r.saveToFile(root.pngPath)) }, Qt.size(1024, 1024)))
+            root.pngGrabbed(false)
         }
       }
     }
@@ -587,7 +641,7 @@ Item {
     var k = String(target.kind).slice(4), i = target.index
     if (k === "name") root.focusName()
     else if (k === "random") root.randomize()
-    else if (k === "size") root.sizeEdited(["s", "m", "l"][i])
+    else if (k === "size") root.editSize(["s", "m", "l"][i])
     else if (k === "tab") root.setTab(i, true)
     else if (root.chipKeys.indexOf(k) >= 0) root.commit(k, root.optionsOf(k)[i])
     else if (k === "style") root.commit("style", ["solid", "outline"][i])
@@ -606,7 +660,7 @@ Item {
   }
 
   function finish() {
-    root.nameEdited(nameField.text.trim())
+    root.editName(nameField.text.trim())
     root.tryOn = null
     root.done()
   }
@@ -635,6 +689,7 @@ Item {
     if (t === "c") { root.copyCode(); return true }
     if (t === "v") { pasteProc.running = true; return true }
     if (t === "e") { root.focusName(); return true }
+    if (t === "\b") { root.deleteKey(); return true }
     return true // swallow the panel's own letter shortcuts while editing
   }
 
@@ -739,7 +794,7 @@ Item {
           foreground: root.foreground
           hasCursor: root.isKey("pet.name")
           onHoveredChanged: if (hovered) root.pointRequested("pet.name", 0)
-          onEditingFinished: root.nameEdited(text.trim())
+          onEditingFinished: root.editName(text.trim())
         }
 
         Row {
@@ -766,7 +821,7 @@ Item {
               { value: "l", label: "L", tooltip: strings.t("pet.size.l", "Large") }
             ]
             cursorIndex: root.keyTarget && root.keyTarget.kind === "pet.size" ? root.keyTarget.index : -1
-            onChanged: function(v) { root.sizeEdited(v) }
+            onChanged: function(v) { root.editSize(v) }
             onHovered: function(i, h) { if (h) root.pointRequested("pet.size", i) }
           }
         }
@@ -1025,7 +1080,7 @@ Item {
           options: [
             { value: "lively", label: strings.t("pet.personality.lively", "Lively"), tooltip: strings.t("pet.personality.livelyTip", "Reacts to everything, with little fidgets") },
             { value: "calm", label: strings.t("pet.personality.calm", "Calm"), tooltip: strings.t("pet.personality.calmTip", "Reacts to you, no idle fidgets") },
-            { value: "still", label: strings.t("pet.personality.still", "Still"), tooltip: strings.t("pet.personality.stillTip", "Poses only, no animation") }
+            { value: "still", label: strings.t("pet.personality.still", "Still"), tooltip: strings.t("pet.personality.stillTip", "Poses only, no animated reactions") }
           ]
           cursorIndex: root.keyTarget && root.keyTarget.kind === "pet.personality" ? root.keyTarget.index : -1
           onChanged: function(v) { root.setReactions(v) }
