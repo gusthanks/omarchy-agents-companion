@@ -16,14 +16,18 @@ while developing is disruptive.
 ## Test and capture in isolation
 
 `dev/run.sh` starts a **separate** Quickshell instance with Omarchy's `Commons`/`Ui`
-libraries and this repo. It never touches the running shell. Capture modes draw on a
-background layer (behind all windows, no focus) and save images straight to files.
+libraries and this repo. It never touches the running shell. Capture modes render
+offscreen (Qt's offscreen platform, so they also work with the screen off) and save images
+straight to files; `HEADLESS=0` draws on a background layer surface instead.
 
 ```bash
 dev/run.sh preview   # a window to play with the pet and its settings
 dev/run.sh face      # docs/pet.png    (the user's current pet, read-only)
 dev/run.sh sheet     # docs/sheet.png  (bodies, eyes, head, accessories, moods, reactions)
-dev/run.sh editor    # docs/editor.png (pet settings)
+dev/run.sh chips     # docs/chips.png  (every editor chip, framed, also in outline / pale)
+dev/run.sh editor    # docs/editor-<tab>.png for shape face extras color saved, and
+                     # docs/editor.png (the face tab); `dev/run.sh editor color` for one
+dev/run.sh png       # Save PNG, backup / restore and editor key checks, in a temp folder
 dev/run.sh gif       # docs/demo.gif   (scripted demo)
 dev/run.sh docs      # all of the above
 ```
@@ -51,5 +55,6 @@ need `omarchy restart shell`. Never use `omarchy refresh shell` (it resets the b
 - Strings go through the plugin's own catalog in `i18n/` (`Commons.Translations`), never
   through `Commons.I18n` keys, which Omarchy may rename.
 - The pet config lives in `~/.config/omarchy/agents-pet.json`; read it, don't rewrite it
-  from tests.
+  from tests. The harness feeds the editor mock saved pets and points backups / PNGs at
+  its own temp folder (`pngDir`, `backupPath`).
 - No code from AGPL projects (e.g. bible-strong-avatar-lab): ideas only.

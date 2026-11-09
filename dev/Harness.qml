@@ -49,39 +49,55 @@ ShellRoot {
   }
 
   // ------------------------------------------------------------ capture window
-  // A background-layer surface: below every window, never tiled, no focus.
-  PanelWindow {
-    visible: shell.capturing
-    WlrLayershell.layer: WlrLayer.Background
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    WlrLayershell.namespace: "agents-pet-dev"
-    exclusionMode: ExclusionMode.Ignore
-    anchors { left: true; bottom: true }
-    implicitWidth: stage.width
-    implicitHeight: stage.height
-    color: "transparent"
+  // HEADLESS=1 (the default in dev/run.sh) renders with Qt's offscreen
+  // platform in a plain window: nothing reaches the desktop, and it works
+  // while the screen is off. Otherwise a background-layer surface is used:
+  // below every window, never tiled, no focus.
+  readonly property bool headless: Quickshell.env("HEADLESS") === "1"
+  property Item stage: null
 
+  Component {
+    id: stageComponent
     Rectangle {
-      id: stage
+      id: stageRect
       color: shell.bg
       width: loader.item ? loader.item.width : 10
       height: loader.item ? loader.item.height : 10
+      Component.onCompleted: shell.stage = stageRect
 
       Loader {
         id: loader
         sourceComponent: shell.mode === "face" ? faceScene
           : shell.mode === "sheet" ? sheetScene
+          : shell.mode === "chips" ? chipsScene
           : shell.mode === "editor" ? editorScene
+          : shell.mode === "png" ? pngScene
           : shell.mode === "gif" ? gifScene : null
       }
     }
   }
 
+  // In its own file: the offscreen platform has no PanelWindow backend, so
+  // the type must not even be parsed there.
+  LazyLoader {
+    active: shell.capturing && !shell.headless
+    source: "LayerStage.qml"
+    onItemChanged: if (item) item.content = stageComponent
+  }
+
+  FloatingWindow {
+    visible: shell.capturing && shell.headless
+    implicitWidth: offLoader.item ? offLoader.item.width : 10
+    implicitHeight: offLoader.item ? offLoader.item.height : 10
+    color: "transparent"
+    Loader { id: offLoader; active: shell.capturing && shell.headless; sourceComponent: stageComponent }
+  }
+
   // One-shot captures: let animations settle, grab at 2x, quit.
   Timer {
-    running: shell.capturing && shell.mode !== "gif"
+    running: shell.capturing && shell.mode !== "gif" && shell.mode !== "png"
     interval: 1600
-    onTriggered: shell.save(stage, shell.out, 2, function() { Qt.quit() })
+    onTriggered: shell.save(shell.stage, shell.out, 2, function() { Qt.quit() })
   }
 
   // ------------------------------------------------------------ scenes
@@ -199,12 +215,25 @@ ShellRoot {
     }
   }
 
+  // Mock saved pets for the editor captures (never written anywhere).
+  readonly property var mockSaved: [
+    { name: shell.petName, look: shell.petLook },
+    { name: "Mochi", look: { body: "ghost", eyes: "googly", color: "theme:magenta", accessory: "bow" } },
+    { name: "Byte", look: { body: "squircle", eyes: "pixel", color: "theme:blue", extra: "antenna" } },
+    { name: "Fern", look: { body: "drop", eyes: "sleepy", mouth: "smile", color: "theme:green", extra: "leaf" } },
+    { name: "Ozzy", look: { body: "orb", eyes: "dot", mouth: "cat", style: "outline", color: "theme:yellow", extra: "ears" } },
+    { name: "Pip", look: { body: "blob", eyes: "capsule", color: "theme:cyan", accessory: "glasses", extra: "horns" } }
+  ]
+
+  // TAB (env): shape | face | extras | color | saved. A few tabs also show
+  // the keyboard cursor trying an option on, or the custom color picker.
   Component {
     id: editorScene
     Rectangle {
       width: 380
       height: editor.implicitHeight + 36
       color: shell.bg
+      readonly property int tabIndex: Math.max(0, ["shape", "face", "extras", "color", "saved"].indexOf(Quickshell.env("TAB") || "shape"))
       Pet.PetEditor {
         id: editor
         x: 18; y: 18
@@ -212,8 +241,122 @@ ShellRoot {
         look: shell.petLook
         petName: shell.petName
         petSize: shell.petConfig.size || "m"
-        saved: [{ name: shell.petName, look: shell.petLook }, { name: "Mochi", look: { body: "ghost", eyes: "googly", color: "theme:magenta", accessory: "bow" } }, { name: "Byte", look: { body: "squircle", eyes: "pixel", color: "theme:blue", extra: "antenna" } }]
+        petReactions: shell.petConfig.reactions || "lively"
+        saved: shell.mockSaved
         themePalette: themeColors
+        tab: parent.tabIndex
+        Component.onCompleted: {
+          var cursor = [{ kind: "pet.body", index: 3 }, { kind: "pet.eyes", index: 2 }, { kind: "pet.accessory", index: 4 },
+                        { kind: "pet.swatch", index: 5 }, { kind: "pet.card", index: 1 }][tab]
+          keyTarget = cursor
+          syncTryOn(cursor)
+          if (tab === 3) pickerOpen = true
+        }
+      }
+    }
+  }
+
+  // Every trait's chips, framed as in the editor (chipLook / chipFrame), in
+  // the pet's own style, then in outline and on a pale pet.
+  Component {
+    id: chipsScene
+    Column {
+      id: chips
+      padding: 18
+      spacing: 10
+      Pet.PetEditor { id: chipEditor; visible: false; width: 344; look: shell.petLook; themePalette: themeColors }
+      Pet.PetEditor { id: outlineEditor; visible: false; width: 344; look: { var l = {}; for (var k in shell.petLook) l[k] = shell.petLook[k]; l.style = "outline"; return l } themePalette: themeColors }
+      Pet.PetEditor { id: paleEditor; visible: false; width: 344; look: { var l = {}; for (var k in shell.petLook) l[k] = shell.petLook[k]; l.color = "theme:foreground"; return l } themePalette: themeColors }
+      Repeater {
+        model: [
+          { label: "body", key: "body", ed: chipEditor }, { label: "eyes", key: "eyes", ed: chipEditor },
+          { label: "mouth", key: "mouth", ed: chipEditor }, { label: "head", key: "extra", ed: chipEditor },
+          { label: "accessory", key: "accessory", ed: chipEditor },
+          { label: "outline body", key: "body", ed: outlineEditor }, { label: "outline eyes", key: "eyes", ed: outlineEditor },
+          { label: "outline head", key: "extra", ed: outlineEditor },
+          { label: "pale acc.", key: "accessory", ed: paleEditor }
+        ]
+        Row {
+          id: chipRow
+          required property var modelData
+          spacing: 8
+          Text { width: 92; anchors.verticalCenter: parent.verticalCenter; text: chipRow.modelData.label; color: shell.dim; font.family: Commons.Style.font.family; font.pixelSize: 13 }
+          Repeater {
+            model: chipRow.modelData.ed.optionsOf(chipRow.modelData.key)
+            Pet.PetChip {
+              required property var modelData
+              required property int index
+              size: 62
+              look: chipRow.modelData.ed.chipLook(chipRow.modelData.key, modelData)
+              framing: chipRow.modelData.ed.chipFrame(chipRow.modelData.key, modelData)
+              isNone: modelData === "none"
+              selected: chipRow.modelData.ed.value(chipRow.modelData.key) === modelData
+              hasCursor: index === 1 && chipRow.modelData.key === "eyes"
+              themePalette: themeColors
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Exercises "Save PNG" and backup export / import into $OUT (a temp
+  // folder): logs PNG / BACKUP / CHECK lines that dev/run.sh prints.
+  Component {
+    id: pngScene
+    Rectangle {
+      width: 380
+      height: 200
+      color: shell.bg
+      Pet.PetEditor {
+        id: fileEditor
+        x: 18; y: 18
+        width: 344
+        visible: false
+        look: shell.petLook
+        petName: shell.petName + " Test"
+        petReactions: "calm"
+        saved: shell.mockSaved
+        themePalette: themeColors
+        pngDir: shell.out
+        backupPath: shell.out + "/agents-pet-backup.json"
+        onRestore: function(s) {
+          console.log("CHECK restore keys=" + Object.keys(s).join(",") + " saved=" + (s.saved ? s.saved.length : "-")
+                      + " size=" + s.size + " reactions=" + s.reactions + " name=" + s.name)
+        }
+        onStatusChanged: if (status !== "") console.log("CHECK status: " + status)
+      }
+      FileView { id: junk; path: shell.out + "/junk.json"; printErrors: false }
+      property int step: 0
+      Timer {
+        running: true
+        repeat: true
+        interval: 900
+        onTriggered: {
+          var s = parent.step++
+          if (s === 0) fileEditor.exportPng()
+          else if (s === 1) fileEditor.exportBackup()
+          else if (s === 2) fileEditor.importBackup()
+          else if (s === 3) { junk.setText("{\"agentsPetBackup\": 1, \"look\": {\"body\": \"evil\", \"color\": \"red;rm\"}, \"size\": \"xxl\", \"saved\": [1, {\"name\": \"" + "x".repeat(40) + "\", \"look\": {\"eyes\": \"googly\"}}]}"); fileEditor.backupPath = shell.out + "/junk.json" }
+          else if (s === 4) fileEditor.importBackup()
+          else if (s === 5) { fileEditor.backupPath = shell.out + "/missing.json"; fileEditor.importBackup() }
+          else if (s === 6) { fileEditor.undo() }
+          else if (s === 7) {
+            // Keyboard model: rows per tab, shortcuts, try-on, Esc.
+            var e = fileEditor
+            for (var t = 0; t < 5; t++) {
+              e.setTab(t, false)
+              console.log("CHECK tab " + t + " rows=" + e.keyRows.map(function(r) { return r.length + ":" + r[0].kind }).join(" "))
+            }
+            e.textKey("2", 0); console.log("CHECK key 2 -> tab " + e.tab)
+            e.textKey("]", 0); console.log("CHECK key ] -> tab " + e.tab)
+            e.syncTryOn({ kind: "pet.accessory", index: 2 }); console.log("CHECK tryOn " + JSON.stringify(e.tryOn) + " stage hat=" + e.previewLook.accessory)
+            e.textKey("4", 0); e.activate({ kind: "pet.swatch", index: e.swatches.length }); console.log("CHECK custom -> picker " + e.pickerOpen)
+            console.log("CHECK Esc closes picker " + e.back() + " then " + e.back())
+            console.log("CHECK chipFrame bow=" + e.chipFrame("accessory", "bow") + " glasses=" + e.chipFrame("accessory", "glasses"))
+          }
+          else Qt.quit()
+        }
       }
     }
   }
@@ -374,10 +517,27 @@ ShellRoot {
           width: parent.width
           look: shell.petLook
           petName: shell.petName
+          saved: shell.mockSaved
           themePalette: themeColors
+          // Stand-in for the panel: in-memory only, never written.
           onLookEdited: function(l) { look = l }
           onNameEdited: function(n) { petName = n }
           onSizeEdited: function(s) { petSize = s }
+          onReactionsEdited: function(r) { petReactions = r }
+          onPointRequested: function(kind, index) { keyTarget = { kind: kind, index: index } }
+          onSaveCurrent: saved = saved.concat([{ name: petName, look: look }])
+          onWear: function(i) { petName = saved[i].name; look = saved[i].look }
+          onForget: function(i) { var l = saved.slice(); l.splice(i, 1); saved = l }
+          onImported: function(n, l) { petName = n; look = l }
+          onRestore: function(s) {
+            if (s.name !== undefined) petName = s.name
+            if (s.look) look = s.look
+            if (s.saved) saved = s.saved
+            if (s.size) petSize = s.size
+            if (s.reactions) petReactions = s.reactions
+          }
+          pngDir: "/tmp/agents-pet-dev-out"
+          backupPath: "/tmp/agents-pet-dev-out/agents-pet-backup.json"
         }
       }
     }

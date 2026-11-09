@@ -18,6 +18,7 @@ Panel {
   readonly property Item hero: panel.loadedContent ? panel.loadedContent.hero : null
   readonly property Item column: panel.loadedContent ? panel.loadedContent.column : null
   readonly property Item providerSections: panel.loadedContent ? panel.loadedContent.providerSections : null
+  readonly property Item petEditor: panel.loadedContent ? panel.loadedContent.petEditor : null
 
   function setting(name, fallback) {
     var value = root.settings ? root.settings[name] : undefined
@@ -56,6 +57,9 @@ Panel {
   Commons.Translations { id: petStrings; directory: Qt.resolvedUrl("i18n") }
   ThemePalette { id: petPalette }
   property bool petEditing: false
+  // The pet editor's open tab, kept while the panel stays loaded.
+  property int petTab: 0
+  onPetEditingChanged: if (petEditing && panelFlick) panelFlick.contentY = 0
 
   // Merge a change into the pet config file and write it back.
   function writePet(patch) {
@@ -65,10 +69,21 @@ Panel {
     petConfigFile.setText(JSON.stringify(cfg, null, 2) + "\n")
   }
 
+  // Capped at 24: the editor disables Save and says so instead of silently
+  // dropping the oldest pet.
   function savePetToInventory() {
+    if (petSaved.length >= 24) return
     var list = petSaved.slice()
     list.push({ name: petConfig.name || "", look: petLook })
-    writePet({ saved: list.slice(-24) })
+    writePet({ saved: list })
+  }
+
+  // Undo snapshots and restored backups: put back whatever keys they carry.
+  function restorePet(s) {
+    var patch = {}
+    var keys = ["name", "look", "saved", "size", "reactions"]
+    for (var i = 0; i < keys.length; i++) if (s && s[keys[i]] !== undefined) patch[keys[i]] = s[keys[i]]
+    writePet(patch)
   }
 
   function wearSavedPet(i) {
@@ -305,6 +320,8 @@ Panel {
     if (addStage === "") hero.push({ kind: "pet", index: 0 })
     if (addStage === "") hero.push({ kind: "launch", index: 0 })
     if (hero.length > 0) rows.push(hero)
+    // The editor replaces the agents below the hero, so only its own rows.
+    if (petEditing && addStage === "" && petEditor) return rows.concat(petEditor.keyRows)
     if (picking) {
       var choices = []
       for (var k = 0; k < addProviders.length; k++) choices.push({ kind: "choice", index: k })
@@ -632,7 +649,8 @@ Panel {
     else if (target.kind === "add") addStage !== "" ? cancelAdd() : addAccount()
     else if (target.kind === "choice") chooseAddProvider(addProviders[target.index].providerId)
     else if (target.kind === "launch") launchAgent()
-    else if (target.kind === "pet") petEditing = !petEditing
+    else if (target.kind === "pet") { if (petEditing && petEditor) petEditor.finish(); else petEditing = true }
+    else if (String(target.kind).indexOf("pet.") === 0) { if (petEditor) petEditor.activate(target) }
     else if (target.kind === "providerSignin") signInAgain(providers[target.index], null)
     else if (target.kind === "signin") signInAgain(pickedEntry.provider, pickedEntry.account)
     else if (target.kind === "autoswitch") setSwitchMode(pickedEntry.provider, autoSwitchFor(pickedEntry.provider) ? "manual" : "auto")
@@ -1372,6 +1390,7 @@ Panel {
       property alias column: column
       property alias providerSections: providerSections
       property alias heroPet: heroAvatar
+      property alias petEditor: petEditorItem
       implicitHeight: column.implicitHeight
       anchors.fill: parent
       reorderable: root.addStage === "" && !root.renaming
@@ -1379,18 +1398,35 @@ Panel {
 
       onMoveRequested: function(dx, dy) {
         // Naming and signing in have their own fields; there the arrows scroll.
-        if (root.addStage === "" || root.picking) root.moveKey(dx, dy)
+        if (root.petEditing && root.petEditor && root.petEditor.fieldFocused) return
+        if (root.addStage === "" || root.picking) {
+          root.moveKey(dx, dy)
+          if (root.petEditing && root.petEditor) root.petEditor.syncTryOn(root.keyTarget)
+        }
         else if (dy !== 0)
           panelFlick.contentY = root.clamp(panelFlick.contentY + dy * Style.space(56), 0,
                                            Math.max(0, panelFlick.contentHeight - panelFlick.height))
       }
-      onActivateRequested: root.activateSelection()
+      onActivateRequested: {
+        // Enter in the name or hex field commits it (editingFinished) and
+        // hands the keys back to the panel.
+        if (root.petEditing && root.petEditor && root.petEditor.fieldFocused) { root.focusKeys(); return }
+        root.activateSelection()
+      }
       onCloseRequested: {
+        if (root.petEditing && root.addStage === "" && root.petEditor) {
+          // Esc steps back one level: a field, the color picker, the editor.
+          if (root.petEditor.fieldFocused) root.focusKeys()
+          else if (!root.petEditor.back()) { root.petEditor.finish(); root.pointAt("pet") }
+          return
+        }
         if (root.addStage !== "") root.cancelAdd()
         else root.close()
       }
+      onDeleteRequested: if (root.petEditing && root.petEditor) root.petEditor.deleteKey()
       onTabRequested: function(direction) { root.switchPanel(direction) }
-      onTextKey: function(t) {
+      onTextKey: function(t, modifiers) {
+        if (root.petEditing && root.addStage === "" && root.petEditor) { root.petEditor.textKey(t, modifiers); return }
         if (t === "r" || t === "R") root.refreshNow()
         else if (t === "m" || t === "M") root.toggleSwitchMode()
         else if (root.addStage === "" && t >= "1" && t <= "9" && Number(t) <= root.accountEntries.length) root.pointAt("account", Number(t) - 1)
@@ -1507,9 +1543,12 @@ Panel {
                 visible: root.addStage === ""
                 hasCursor: root.hasKey("pet")
                 onHovered: root.pointAt("pet")
-                glyph: root.petEditing ? "󰅖" : "󰒓"
-                tooltip: petStrings.t("pet.edit")
-                onClicked: root.petEditing = !root.petEditing
+                glyph: root.petEditing ? "󰄬" : "󰒓"
+                tooltip: root.petEditing ? petStrings.t("pet.done", "Done") : petStrings.t("pet.edit", "Pet settings")
+                onClicked: {
+                  if (root.petEditing && root.petEditor) root.petEditor.finish()
+                  else root.petEditing = true
+                }
               }
 
               HeroButton {
@@ -1655,12 +1694,21 @@ Panel {
 
           // ---------- Pet editor ----------
           PetEditor {
+            id: petEditorItem
             visible: root.petEditing && root.addStage === ""
             width: parent.width
             look: root.petLook
             petName: root.petConfig.name || ""
             petSize: root.petSize
+            petReactions: root.petReactions
             saved: root.petSaved
+            keyTarget: root.keyTarget
+            tab: root.petTab
+            onTabChanged: root.petTab = tab
+            onPointRequested: function(kind, index) { root.pointAt(kind, index) }
+            onRevealRequested: function(item) { root.revealItem(item) }
+            onRestore: function(s) { root.restorePet(s) }
+            onReactionsEdited: function(r) { root.writePet({ reactions: r }) }
             themePalette: petPalette
             foreground: root.foreground
             dim: root.dim

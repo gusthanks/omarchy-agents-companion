@@ -33,6 +33,10 @@ Item {
   property bool showMarks: true
   // Hearts and confetti (off in the bar, which is one icon tall).
   property bool particles: true
+  // Editor chips: a still, zoomed crop of one part of the pet. "" draws the
+  // whole live pet; silhouette | eyes | mouth | top | topLeft | topRight.
+  property string framing: ""
+  readonly property bool still: root.framing !== ""
 
   signal clicked()
 
@@ -114,6 +118,7 @@ Item {
   onSeasonHatChanged: canvas.requestPaint()
   onSizeChanged: canvas.requestPaint()
   onFaceChanged: canvas.requestPaint()
+  onFramingChanged: canvas.requestPaint()
 
   NumberAnimation on phase {
     from: 0; to: Math.PI * 2
@@ -612,8 +617,8 @@ Item {
   function paintEyes(ctx, cx, cy, r) {
     var f = root.face
     // The cursor's gaze, mixed with the expression's own.
-    var gzx = root.gazeX * (1 - f.gazeLock) + f.gazeX
-    var gzy = root.gazeY * (1 - f.gazeLock) + f.gazeY
+    var gzx = (root.still ? 0 : root.gazeX) * (1 - f.gazeLock) + f.gazeX
+    var gzy = (root.still ? 0 : root.gazeY) * (1 - f.gazeLock) + f.gazeY
     var gx = gzx * r * 0.2
     var gy = gzy * r * 0.16
     var sp = r * 0.62
@@ -628,7 +633,7 @@ Item {
     for (var s = -1; s <= 1; s += 2) {
       var ex = cx + s * sp / 2 + gx
       var open = f.eyeOpen * (s < 0 ? f.eyeOpenL : f.eyeOpenR)
-      var blink = Math.max(0.08, root.blink * open)
+      var blink = Math.max(0.08, (root.still ? 1 : root.blink) * open)
       var eye = style
       // A nearly shut eye (a wink) reads better as a happy arc.
       if (open < 0.3 && (eye === "capsule" || eye === "dot" || eye === "pixel" || eye === "googly")) eye = "happy"
@@ -938,20 +943,44 @@ Item {
     ctx.globalAlpha = 1
   }
 
+  // Where a framed chip looks, and how close: {x, y, z} in the same space as
+  // cx / cy. Every chip zoom lives here.
+  function frameFocus(framing, cx, cy, r) {
+    if (framing === "eyes") return { x: cx, y: cy - 0.08 * r, z: 1.5 }
+    if (framing === "mouth") return { x: cx, y: cy + 0.18 * r, z: 1.6 }
+    if (framing === "top") return { x: cx, y: headTop(cy, r, 1) + 0.12 * r, z: 1.35 }
+    if (framing === "topRight") return { x: cx + 0.42 * r, y: cy - 0.62 * r, z: 1.7 }
+    if (framing === "topLeft") return { x: cx - 0.42 * r, y: cy - 0.62 * r, z: 1.7 }
+    return { x: cx, y: cy, z: 1.0 }
+  }
+
   function paintPet(ctx, S) {
     ctx.reset()
     ctx.translate(0, S * 0.15)
     var cx = S / 2
     var r = S * 0.36
-    // Leave headroom for anything that grows above the head.
-    var tall = root.extraStyle !== "none" || root.headwear !== "" || root.accessory === "bow" || root.accessory === "flower"
+    var still = root.still
+    // Leave headroom for anything that grows above the head. Chips always
+    // use the tall frame, so every chip in a row has the same size.
+    var tall = still || root.extraStyle !== "none" || root.headwear !== "" || root.accessory === "bow" || root.accessory === "flower"
     var f = root.face
-    var cy = S / 2 + (tall ? S * 0.07 : 0) + root.hop * 2 + f.hop * S
+    var cy = S / 2 + (tall ? S * 0.07 : 0) + (still ? 0 : root.hop * 2 + f.hop * S)
     if (tall) r = S * 0.34
-    var grow = root.hovered && root.interactive ? 1.04 : 1.0
-    var sq = root.squash + f.squash
-    var sx = (1 + 0.025 * root.breathe + 0.14 * sq) * grow
-    var sy = (1 - 0.025 * root.breathe - 0.14 * sq) * grow
+    var grow = root.hovered && root.interactive && !still ? 1.04 : 1.0
+    var br = still ? 0 : root.breathe
+    var sq = still ? 0 : root.squash + f.squash
+    var sx = (1 + 0.025 * br + 0.14 * sq) * grow
+    var sy = (1 - 0.025 * br - 0.14 * sq) * grow
+    var zoom = 1
+    if (still) {
+      var fo = frameFocus(root.framing, cx, cy, r)
+      zoom = fo.z
+      ctx.reset()
+      ctx.translate(S / 2, S * 0.65)
+      ctx.scale(fo.z, fo.z)
+      ctx.translate(-fo.x, -fo.y)
+    }
+    var shapeOnly = root.framing === "silhouette"
 
     // Tilt, sideways shift and scale pivot on the base of the body, so hats
     // and ears follow the head. Marks are drawn after, upright.
@@ -975,9 +1004,10 @@ Item {
     ctx.fill()
     if (!root.solid) {
       ctx.strokeStyle = root.rgba(root.baseColor, 0.95)
-      ctx.lineWidth = S * 0.03
+      ctx.lineWidth = S * 0.03 / zoom
       ctx.stroke()
     }
+    if (shapeOnly) return
 
     var eyes = paintEyes(ctx, cx, cy, r)
 
@@ -1002,7 +1032,7 @@ Item {
     paintAccessory(ctx, cx, cy, r, sx, sy, eyes)
     paintHeadwear(ctx, cx, cy, r, sx, sy)
     if (moved) ctx.restore()
-    if (root.showMarks) paintMarks(ctx, S, cx, cy, r)
+    if (root.showMarks && !still) paintMarks(ctx, S, cx, cy, r)
   }
 
   MouseArea {

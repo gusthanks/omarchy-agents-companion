@@ -32,23 +32,33 @@ reshape it however you like.
   time, a quieter subscription to switch to, tokens today and per session, a late-night
   nudge), then a pool of general tips for working with agents. It rotates slowly, pauses
   while you hover it, and the › button jumps to the next tip.
-- **Pet settings**: click the gear in the panel header.
-  - Size: small, medium, large (panel and bar)
-  - Body: blob, orb, squircle, drop, ghost
-  - Eyes: capsule, dot, googly, pixel, sleepy
-  - Mouth: none, smile, o, cat, flat
-  - Head: antenna, leaf, ears, horns
-  - Accessory: glasses, top hat, beanie, bow, flower
-  - Style: solid or outline, cheeks on or off
-  - Color: your current theme's colors (they follow theme switches), or any color from the
-    picker / a hex code
-  - Name, 🎲 random, reset
-  - **Saved pets**: keep the pets you make and wear them again in one click
-  - **Copy / paste code**: share a pet as a short JSON code through the clipboard
+- **Pet settings**: click the gear in the panel header. A stage with the pet, its name and
+  its size in the bar (S / M / L) sit on top; five tabs below:
+  - **Shape**: body (blob, orb, squircle, drop, ghost) and style (solid or outline)
+  - **Face**: eyes (capsule, dots, googly, pixel, sleepy), mouth (none, smile, surprised,
+    cat, flat), blush cheeks, and the **personality**: Lively (every reaction and little
+    fidgets), Calm (reacts to you, no idle fidgets) or Still (poses only, no animation),
+    with buttons to try a few reactions on the stage
+  - **Extras**: head (antenna, leaf, ears, horns) and accessory (glasses, top hat, beanie,
+    bow, flower)
+  - **Color**: your current theme's colors (they follow theme switches), or any color from
+    the custom picker / a hex code
+  - **Saved**: keep the pets you make (up to 24) and wear them again in one click; copy /
+    paste a pet as a short JSON code; **Back up all** writes the current pet, saved pets,
+    size and personality to `~/Documents/agents-pet-backup.json` (or `~/` when there is no
+    Documents folder) and **Restore** reads it back; **Save PNG** saves the pet as a
+    transparent 1024 px image in `~/Pictures/agents-pet-<name>.png`
+
+  Pointing at an option tries it on the stage; a click commits it. 🎲 rolls a random look,
+  Reset goes back to the default, and Undo puts back the last random roll, reset, worn,
+  removed, pasted or restored pet. The keyboard works too: arrows / hjkl move, Enter picks,
+  1-5 or [ ] switch tabs, r random, u undo, s save, c / v copy / paste a code, e edit the
+  name, x or Delete removes a saved pet, and Esc steps back (picker, then the editor, then
+  the panel).
 
   Changes apply live and are saved to `~/.config/omarchy/agents-pet.json`.
 
-<p align="center"><img src="docs/sheet.png" width="520" alt="Bodies, eyes, head extras, accessories, moods and reactions">&nbsp;<img src="docs/editor.png" width="260" alt="Pet settings"></p>
+<p align="center"><img src="docs/sheet.png" width="520" alt="Bodies, eyes, head extras, accessories, moods and reactions">&nbsp;<img src="docs/editor.png" width="260" alt="Pet settings, Face tab: eye and mouth chips, blush cheeks and personality"></p>
 
 The panel follows Omarchy's language setting: the stock panel strings ship in all 50
 Omarchy languages, and the pet's own strings in English and Brazilian Portuguese.
@@ -110,7 +120,8 @@ BlobAvatar.qml     the pet (one Canvas, drawn from a "look" object and a "face")
 PetFace.js         expression channels, named expressions, easing
 PetClips.js        reactions as data (steps, priorities, cooldowns)
 FacePlayer.qml     plays one reaction at a time over the mood / sleep pose
-PetEditor.qml      pet settings with live preview and saved pets
+PetEditor.qml      pet settings: stage, tabs, try-on, undo, saved pets, backup, PNG
+PetChip.qml        one framed option chip in the settings
 ColorPicker.qml    saturation/value square + hue strip
 ThemePalette.qml   reads the current theme's named colors
 Main.qml, Agent.qml, assets/   stock Agents plugin pieces
@@ -128,6 +139,8 @@ bar you are using is never reloaded while you work. See [AGENTS.md](AGENTS.md).
 git clone https://github.com/gusthanks/omarchy-agents-pet.git ~/Work/omarchy-agents-pet
 cd ~/Work/omarchy-agents-pet
 dev/run.sh preview      # separate Quickshell instance with the pet and its settings
+dev/run.sh editor face  # docs/editor-face.png (any tab: shape face extras color saved)
+dev/run.sh png          # checks Save PNG, backup / restore and the editor's keys (temp folder)
 dev/run.sh docs         # regenerate the images in docs/
 git commit -am "..."    # then, when it is done:
 dev/deploy.sh           # fast-forward the installed plugin to HEAD
