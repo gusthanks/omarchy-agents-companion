@@ -1,0 +1,14 @@
+{
+  "pet.name": "NAME",
+  "pet.random": "Random",
+  "pet.reset": "Reset",
+  "pet.done": "Done",
+  "pet.edit": "Edit pet",
+  "pet.trait.body": "BODY",
+  "pet.trait.eyes": "EYES",
+  "pet.trait.mouth": "MOUTH",
+  "pet.trait.extra": "EXTRA",
+  "pet.trait.style": "STYLE",
+  "pet.trait.cheeks": "CHEEKS",
+  "pet.trait.color": "COLOR"
+}

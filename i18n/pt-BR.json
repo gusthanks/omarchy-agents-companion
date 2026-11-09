@@ -1,0 +1,14 @@
+{
+  "pet.name": "NOME",
+  "pet.random": "Aleatório",
+  "pet.reset": "Restaurar",
+  "pet.done": "Pronto",
+  "pet.edit": "Editar pet",
+  "pet.trait.body": "CORPO",
+  "pet.trait.eyes": "OLHOS",
+  "pet.trait.mouth": "BOCA",
+  "pet.trait.extra": "EXTRA",
+  "pet.trait.style": "ESTILO",
+  "pet.trait.cheeks": "BOCHECHAS",
+  "pet.trait.color": "COR"
+}

@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "id": "gusthx.agents",
-  "name": "My Agents",
-  "version": "1.0.0",
+  "id": "gusthx.agents-pet",
+  "name": "Agents Pet",
+  "version": "2.0.0",
   "author": "Gustavo Costa",
   "license": "MIT",
-  "description": "Usage, limits, pace, and prepaid balances for every AI agent and provider in a native Omarchy bar panel.",
+  "description": "A customizable flat pet for your Omarchy bar that follows your cursor and shares calm tips about your AI-agent usage, on top of the stock Agents panel.",
   "kinds": [
     "bar-widget"
   ],
@@ -14,12 +14,13 @@
     "barWidget": "Panel.qml"
   },
   "barWidget": {
-    "displayName": "My Agents",
-    "description": "One bar icon and one panel: rate-limit meters with pace, today, the last week, and the all-time model breakdown for every subscription.",
+    "displayName": "Agents Pet",
+    "description": "Agents panel with a sculptable pet: limits, pace, today and the last week for every AI subscription, plus usage tips.",
     "category": "AI",
     "aliases": [
       "agents",
-      "model-usage"
+      "model-usage",
+      "pet"
     ],
     "allowMultiple": false,
     "defaults": {
@@ -99,9 +100,7 @@
       "syncDir": "",
       "syncFileName": "",
       "syncDeviceId": "",
-      "companionName": "Kian",
-      "companionModel": "gemini-3.8-flash-medium",
-      "companionEffort": "medium"
+      "companionName": "Kian"
     },
     "schema": [
       {
@@ -109,26 +108,7 @@
         "type": "string",
         "label": "Companion name",
         "defaultValue": "Kian",
-        "description": "Name of your desktop AI companion."
-      },
-      {
-        "key": "companionModel",
-        "type": "string",
-        "label": "Companion model",
-        "defaultValue": "gemini-3.8-flash-medium",
-        "description": "Headless agy model used by companion."
-      },
-      {
-        "key": "companionEffort",
-        "type": "enum",
-        "label": "Reasoning effort",
-        "options": [
-          "low",
-          "medium",
-          "high"
-        ],
-        "defaultValue": "medium",
-        "description": "Reasoning effort for companion turns."
+        "description": "Default name for your pet (the editor in the panel overrides it)."
       },
       {
         "key": "refreshIntervalSec",

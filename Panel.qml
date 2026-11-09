@@ -8,8 +8,8 @@ import qs.Ui
 
 Panel {
   id: root
-  moduleName: "omarchy.agents"
-  ipcTarget: "omarchy.agents"
+  moduleName: "gusthx.agents-pet"
+  ipcTarget: "gusthx.agents-pet"
   manageIpc: false
 
   // Items inside the panel's lazily built content, null until it first
@@ -18,42 +18,40 @@ Panel {
   readonly property Item hero: panel.loadedContent ? panel.loadedContent.hero : null
   readonly property Item column: panel.loadedContent ? panel.loadedContent.column : null
   readonly property Item providerSections: panel.loadedContent ? panel.loadedContent.providerSections : null
-  readonly property Item companionView: panel.loadedContent ? panel.loadedContent.companionView : null
 
   function setting(name, fallback) {
     var value = root.settings ? root.settings[name] : undefined
     return value === undefined || value === null ? fallback : value
   }
 
-  // Persisted companion settings
+  // Persisted pet: name + look, written by the inline editor.
+  readonly property string petConfigPath: (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")) + "/omarchy/agents-pet.json"
+
   FileView {
-    id: companionConfigFile
-    path: (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")) + "/omarchy/agents-companion.json"
+    id: petConfigFile
+    path: root.petConfigPath
     watchChanges: true
     printErrors: false
+    onFileChanged: reload()
   }
 
-  property string persistedModel: {
-    var raw = companionConfigFile.text()
+  readonly property var petConfig: {
+    var raw = petConfigFile.text()
     if (raw && raw.trim() !== "") {
-      try {
-        var cfg = JSON.parse(raw)
-        if (cfg.companionModel && cfg.companionModel.trim() !== "") {
-          return cfg.companionModel.trim()
-        }
-      } catch (e) {
-      }
+      try { return JSON.parse(raw) } catch (e) {}
     }
-    return ""
+    return ({})
   }
 
-  property string activeCompanionModel: persistedModel !== ""
-    ? persistedModel
-    : (String(setting("companionModel", "gemini-3.8-flash-medium")).trim() || "gemini-3.8-flash-medium")
+  readonly property string companionName: String(petConfig.name || setting("companionName", "Kian")).trim() || "Kian"
+  readonly property var petLook: petConfig.look || ({})
+  Commons.Translations { id: petStrings; directory: Qt.resolvedUrl("i18n") }
+  property bool petEditing: false
 
-  readonly property string companionName: String(setting("companionName", "Kian")).trim() || "Kian"
-  readonly property string companionModel: activeCompanionModel
-  readonly property string companionEffort: companionModel.endsWith("-high") ? "high" : (companionModel.endsWith("-low") ? "low" : "medium")
+  function savePet(name, look) {
+    var cfg = { name: name, look: look }
+    petConfigFile.setText(JSON.stringify(cfg, null, 2) + "\n")
+  }
   property bool tipBannerHovered: false
 
   readonly property int totalTokensToday: {
@@ -77,84 +75,6 @@ Panel {
       }
     }
     return total
-  }
-
-  function setCompanionModel(newModelId) {
-    if (!newModelId) return
-    activeCompanionModel = newModelId
-    var cfg = {
-      companionModel: newModelId,
-      updatedAt: new Date().toISOString()
-    }
-    var jsonStr = JSON.stringify(cfg, null, 2)
-    var path = (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")) + "/omarchy/agents-companion.json"
-    Quickshell.execDetached(["python3", "-c", "import sys; open(sys.argv[1], 'w').write(sys.argv[2])", path, jsonStr])
-    companionAvatarState = "happy"
-    avatarHappyTimer.restart()
-  }
-
-  readonly property var defaultModels: [
-    { id: "gemini-3.8-flash-medium", label: "Gemini 3.8 Flash (Medium)" },
-    { id: "gemini-3.8-flash-high", label: "Gemini 3.8 Flash (High)" },
-    { id: "gemini-4-argon-medium", label: "Gemini 4 Argon (Medium)" },
-    { id: "gemini-4-argon-high", label: "Gemini 4 Argon (High)" },
-    { id: "claude-sonnet-5-5-medium", label: "Claude Sonnet 5.5 (Medium)" },
-    { id: "claude-sonnet-5-5-high", label: "Claude Sonnet 5.5 (High)" },
-    { id: "claude-opus-5-5-medium", label: "Claude Opus 5.5 (Medium)" },
-    { id: "gpt-oss-120b-medium", label: "GPT-OSS 120B (Medium)" }
-  ]
-
-  property var availableModels: defaultModels
-
-  Process {
-    id: agyModelsProc
-    running: false
-    command: ["agy", "models"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: function(text) {
-        root.parseAgyModels(text)
-      }
-    }
-  }
-
-  function fetchAvailableModels() {
-    if (!agyModelsProc.running) agyModelsProc.running = true
-  }
-
-  function parseAgyModels(output) {
-    var lines = String(output || "").split("\n")
-    var found = []
-    var seen = {}
-    for (var i = 0; i < lines.length; i++) {
-      var line = lines[i].replace(/.*Fetching available models\.\.\./g, "").trim()
-      if (!line) continue
-      var match = line.match(/^(\S+)\s+(.+)$/)
-      if (match) {
-        var mid = match[1].trim()
-        var mlabel = match[2].trim()
-        if (!seen[mid]) {
-          seen[mid] = true
-          found.push({ id: mid, label: mlabel })
-        }
-      }
-    }
-    if (found.length > 0) {
-      root.availableModels = found
-    }
-  }
-
-  function modelLabelFor(modelId) {
-    if (availableModels && availableModels.length > 0) {
-      for (var i = 0; i < availableModels.length; i++) {
-        if (availableModels[i].id === modelId) return availableModels[i].label
-      }
-    }
-    for (var j = 0; j < defaultModels.length; j++) {
-      if (defaultModels[j].id === modelId) return defaultModels[j].label
-    }
-    if (!modelId) return "Gemini 3.8 Flash (Medium)"
-    return modelId.replace(/-/g, " ").replace(/\b\w/g, function(l){ return l.toUpperCase() })
   }
 
   readonly property bool currentInsightIsAlert: {
@@ -1009,23 +929,16 @@ Panel {
 
     // 3. Token Pace & Efficiency
     if (totalSessions > 0) {
-      var avgPerSession = Math.round(totalTokens / Math.max(1, totalSessions) / 1000)
+      var avgPerSession = usage.formatTokenCount(Math.round(totalTokens / Math.max(1, totalSessions)))
       list.push({
         badge: "SESSION PACE",
         icon: "⏱️",
-        phrase: "Pace: ~" + Commons.I18n.formatNumber(avgPerSession) + "k tokens / session",
-        details: "Averaging ~" + Commons.I18n.formatNumber(avgPerSession) + "k tokens across " + totalSessions + " active sessions today."
+        phrase: "Pace: ~" + avgPerSession + " tokens / session",
+        details: "Averaging ~" + avgPerSession + " tokens across " + totalSessions + " active sessions today."
       })
     }
 
-    // 4. Pro Tips & Companion Advice
-    list.push({
-      badge: "OPTIMIZATION",
-      icon: "💡",
-      phrase: "Tip: Ask " + companionName + " below for instant system & token insights",
-      details: "You can ask " + companionName + " anything about your machine, battery, running tasks, or quota pace in the companion prompt below."
-    })
-
+    // 4. Pro tips
     list.push({
       badge: "CACHE EFFICIENCY",
       icon: "⚡",
@@ -1043,9 +956,6 @@ Panel {
       deepInsightIndex = (deepInsightIndex + 1) % deepInsights.length
       var ins = deepInsights[deepInsightIndex]
       shownPhrase = ins.phrase
-      if (companionView) {
-        companionView.currentInsight = ins
-      }
     }
   }
 
@@ -1053,7 +963,7 @@ Panel {
     id: avatarHappyTimer
     interval: 850
     repeat: false
-    onTriggered: companionAvatarState = (companionView && companionView.isThinking) ? "thinking" : (alarming ? "warning" : "idle")
+    onTriggered: companionAvatarState = "idle"
   }
 
   property int phraseIndex: 0
@@ -1069,9 +979,6 @@ Panel {
     if (deepInsights.length > 0) {
       var ins = deepInsights[deepInsightIndex % deepInsights.length]
       shownPhrase = ins.phrase
-      if (companionView && companionView.lastResponseText === "") {
-        companionView.currentInsight = ins
-      }
     } else {
       var n = summaryPhrases.length
       shownPhrase = n > 0 ? summaryPhrases[phraseIndex % n] : ""
@@ -1177,7 +1084,6 @@ Panel {
   implicitHeight: button.implicitHeight
 
   onOpenedChanged: if (opened) {
-    root.fetchAvailableModels()
     if (addStage !== "running") addStage = ""
     resetKeys()
     if (usage.enabledProviders.length === 0 && !checkProcess.running) checkProcess.running = true
@@ -1187,6 +1093,7 @@ Panel {
     Qt.callLater(function() { if (panel.loadedContent) panel.loadedContent.forceActiveFocus() })
   } else {
     root.tipBannerHovered = false
+    root.petEditing = false
   }
 
   Main {
@@ -1270,16 +1177,8 @@ Panel {
     function hide(): void { root.close() }
     function toggle(): void { root.toggle() }
     function refresh(): string { root.refreshNow(); return "ok" }
-    function getModel(): string { return root.companionModel }
-    function setModel(modelId: string): string { root.setCompanionModel(modelId); return root.companionModel }
     function nextInsight(): string { root.showNextInsight(); return root.shownPhrase }
-    function askCompanion(prompt: string): string {
-      if (companionView) {
-        companionView.askQuestion(prompt)
-        return "asked"
-      }
-      return "no companionView"
-    }
+    function editPet(): void { root.open(); root.petEditing = true }
   }
 
   BarIconButton {
@@ -1311,7 +1210,6 @@ Panel {
       property alias hero: hero
       property alias column: column
       property alias providerSections: providerSections
-      property alias companionView: companionView
       implicitHeight: column.implicitHeight
       anchors.fill: parent
       reorderable: root.addStage === "" && !root.renaming
@@ -1365,7 +1263,7 @@ Panel {
           width: panelFlick.width - panelFlick.overhang - (panelFlick.interactive ? panelScroll.width + Style.space(6) : 0)
           spacing: Style.space(16)
 
-          // ---------- Hero: Avatar · Companion Name · Brain Selector · Actions ----------
+          // ---------- Hero: pet · name · actions ----------
           Item {
             id: hero
             width: parent.width
@@ -1377,12 +1275,12 @@ Panel {
               id: heroAvatar
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
-              size: Style.space(42)
+              size: Style.space(54)
               foreground: root.foreground
               accentColor: Commons.Color.accent
-              warningColor: root.urgent
-              alarming: root.alarming
               avatarState: root.companionAvatarState
+              look: root.petLook
+              trackGlobalCursor: root.opened
               onClicked: root.showNextInsight()
             }
 
@@ -1395,41 +1293,16 @@ Panel {
               anchors.verticalCenter: parent.verticalCenter
               spacing: Style.space(3)
 
-              // Name + Brain Selector Row
-              Row {
-                id: heroTitleRow
+              Text {
+                id: companionNameLabel
+                textFormat: Text.PlainText
+                text: root.companionName
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.title
+                font.bold: true
+                elide: Text.ElideRight
                 width: parent.width
-                spacing: Style.space(6)
-
-                Text {
-                  id: companionNameLabel
-                  textFormat: Text.PlainText
-                  text: root.companionName
-                  color: root.foreground
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.title
-                  font.bold: true
-                  elide: Text.ElideRight
-                  width: Math.min(implicitWidth, Math.max(Style.space(40), heroTitleRow.width - Style.space(90)))
-                  anchors.verticalCenter: parent.verticalCenter
-                }
-
-                BrainSelector {
-                  id: heroBrainSelector
-                  anchors.verticalCenter: parent.verticalCenter
-                  maxWidth: (heroTitleRow.width > 0 && companionNameLabel.width > 0)
-                    ? Math.max(0, heroTitleRow.width - companionNameLabel.width - heroTitleRow.spacing)
-                    : -1
-                  modelId: root.companionModel
-                  availableModels: root.availableModels
-                  foreground: root.foreground
-                  dim: root.dim
-                  accent: Commons.Color.accent
-                  fontFamily: root.fontFamily
-                  onModelSelected: function(id, label) {
-                    root.setCompanionModel(id)
-                  }
-                }
               }
 
               // Subtitle / Status indicator
@@ -1438,7 +1311,6 @@ Panel {
                 textFormat: Text.PlainText
                 text: {
                   if (root.addStage !== "") return root.addHeading.toUpperCase()
-                  if (root.companionView && root.companionView.isThinking) return "THINKING..."
                   if (!usage || !usage.formatTokenCount) return ""
                   if (root.totalTokensToday > 0) {
                     return Commons.I18n.tn("agents.tokensToday", root.totalTokensToday).arg(usage.formatTokenCount(root.totalTokensToday)).toUpperCase()
@@ -1448,9 +1320,7 @@ Panel {
                   }
                   return Commons.I18n.tn("agents.tokensToday", 0).arg(usage.formatTokenCount(0)).toUpperCase()
                 }
-                color: (root.companionView && root.companionView.isThinking)
-                  ? Commons.Color.accent
-                  : root.dim
+                color: root.dim
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption - 1
                 font.bold: true
@@ -1466,6 +1336,13 @@ Panel {
               anchors.verticalCenter: parent.verticalCenter
               spacing: Style.space(6)
               visible: root.addStage === "" || root.addButtonShown
+
+              HeroButton {
+                visible: root.addStage === ""
+                glyph: root.petEditing ? "󰅖" : "󰏫"
+                tooltip: petStrings.t("pet.edit")
+                onClicked: root.petEditing = !root.petEditing
+              }
 
               HeroButton {
                 visible: root.addButtonShown
@@ -1491,7 +1368,7 @@ Panel {
           // ---------- Companion Tip & Alert Banner (Full width, multi-line) ----------
           Rectangle {
             id: tipBanner
-            visible: root.addStage === "" && !root.blankSlate && root.heroPhrase !== ""
+            visible: root.addStage === "" && !root.blankSlate && root.heroPhrase !== "" && !root.petEditing
             width: parent.width
             radius: Style.cornerRadius
             color: root.currentInsightIsAlert
@@ -1543,7 +1420,11 @@ Panel {
                 id: tipBannerText
                 textFormat: Text.PlainText
                 width: parent.width
-                text: root.heroPhrase
+                // Read straight from the current insight so the badge and text
+                // can never drift apart when the insight list is rebuilt.
+                text: root.deepInsights.length > 0
+                  ? root.deepInsights[root.deepInsightIndex % root.deepInsights.length].phrase
+                  : root.heroPhrase
                 color: root.currentInsightIsAlert ? Commons.Color.urgent : root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body
@@ -1564,35 +1445,18 @@ Panel {
             }
           }
 
-          // ---------- Companion (Kian) ----------
-          CompanionView {
-            id: companionView
-            visible: root.addStage === "" && !root.blankSlate
+          // ---------- Pet editor ----------
+          PetEditor {
+            visible: root.petEditing && root.addStage === ""
             width: parent.width
-            companionName: root.companionName
-            companionModel: root.companionModel
-            companionModelDisplayName: root.modelLabelFor(root.companionModel)
-            companionEffort: root.companionEffort
+            look: root.petLook
+            petName: root.petConfig.name || ""
             foreground: root.foreground
             dim: root.dim
-            surface: root.surface
             fontFamily: root.fontFamily
-            providers: root.providers
-            alarming: root.alarming
-            currentInsight: root.deepInsights.length > 0 ? root.deepInsights[root.deepInsightIndex % root.deepInsights.length] : null
-            onAvatarStateChanged: {
-              if (avatarState !== "idle" || root.companionAvatarState === "thinking" || root.companionAvatarState === "speaking") {
-                root.companionAvatarState = avatarState
-              }
-            }
-            onOpenBrainSelectorRequested: {
-              if (heroBrainSelector) heroBrainSelector.open()
-            }
-          }
-
-          PanelSeparator {
-            visible: root.addStage === "" && !root.blankSlate && root.providers.length > 0
-            foreground: root.foreground
+            onLookEdited: function(look) { root.savePet(root.petConfig.name || "", look) }
+            onNameEdited: function(name) { if (name !== (root.petConfig.name || "")) root.savePet(name, root.petLook) }
+            onDone: root.petEditing = false
           }
 
           AddView {
@@ -1835,7 +1699,7 @@ Panel {
     spacing: Style.space(16)
     opacity: root.dragProviderId !== "" && provider && root.dragProviderId === provider.providerId ? 0.5 : 1.0
 
-    PanelSeparator { foreground: root.foreground }
+    PanelSeparator { visible: section.providerIndex > 0; foreground: root.foreground }
 
     Item {
       id: sectionHead
