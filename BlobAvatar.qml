@@ -27,6 +27,10 @@ Item {
   property bool lively: true
   // Santa hat on Dec 24-25, party hat on Dec 31 / Jan 1.
   property bool seasonal: true
+  // Floating "!" / "z" marks (off in the bar, where they would be clipped).
+  property bool showMarks: true
+  // Hearts and confetti (off in the bar, which is one icon tall).
+  property bool particles: true
 
   property string avatarState: "idle" // idle | happy (transient)
   property bool asleep: false
@@ -53,8 +57,13 @@ Item {
   readonly property string fillStyle: opt("style", "solid")
   readonly property string colorChoice: opt("color", "theme")
 
+  // Shared ThemePalette from the host; resolves "theme:<name>" colors.
+  property var themePalette: null
   readonly property color baseColor: {
-    if (root.colorChoice === "theme") return root.accentColor
+    if (root.themePalette) {
+      var dep = root.themePalette.colors
+      return root.themePalette.resolve(root.colorChoice, root.accentColor)
+    }
     return /^#[0-9a-fA-F]{6}$/.test(root.colorChoice) ? root.colorChoice : root.accentColor
   }
   readonly property bool solid: root.fillStyle === "solid"
@@ -198,6 +207,7 @@ Item {
   readonly property Item windowRoot: root.Window.contentItem
 
   function spawnParticle(glyph, dx, dy, color) {
+    if (!root.particles) return
     var host = root.windowRoot || root
     var origin = root.mapToItem(host, root.width / 2, root.height * 0.3)
     particleComp.createObject(host, { glyph: glyph, ox: origin.x, oy: origin.y, dx: dx, dy: dy, tint: color })
@@ -318,8 +328,10 @@ Item {
   Canvas {
     id: canvas
     // Draw at 2x and scale down so the pet stays crisp on fractional scaling.
+    // Taller than wide: the extra room above keeps hats and antennas inside
+    // the canvas when the pet hops.
     width: root.size * 2
-    height: root.size * 2
+    height: root.size * 2.6
     scale: 0.5
     anchors.centerIn: parent
     renderStrategy: Canvas.Cooperative
@@ -706,6 +718,7 @@ Item {
 
   function paintPet(ctx, S) {
     ctx.reset()
+    ctx.translate(0, S * 0.15)
     var cx = S / 2
     var r = S * 0.36
     // Leave headroom for anything that grows above the head.
@@ -744,7 +757,7 @@ Item {
     paintMouth(ctx, cx, r, eyes)
     paintAccessory(ctx, cx, cy, r, sx, sy, eyes)
     paintHeadwear(ctx, cx, cy, r, sx, sy)
-    paintMarks(ctx, S, cx, cy, r)
+    if (root.showMarks) paintMarks(ctx, S, cx, cy, r)
   }
 
   MouseArea {

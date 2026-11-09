@@ -46,7 +46,21 @@ Item {
     { key: "cheeks", options: [true, false] }
   ]
 
-  readonly property var swatches: ["theme", "#f38ba8", "#fab387", "#f9e2af", "#a6e3a1", "#94e2d5", "#89b4fa", "#cba6f7", "#e8e8e8"]
+  // Shared ThemePalette (from the panel). Suggested colors are the current
+  // theme's own, stored as "theme:<name>" so the pet follows theme switches.
+  property var themePalette: null
+  readonly property var swatches: {
+    var out = ["theme"]
+    if (!root.themePalette) return out
+    var cols = root.themePalette.colors
+    var names = root.themePalette.names
+    for (var i = 0; i < names.length; i++) if (cols[names[i]]) out.push("theme:" + names[i])
+    return out
+  }
+  function swatchColor(choice) {
+    return root.themePalette ? root.themePalette.resolve(choice, root.accent) : (choice === "theme" ? root.accent : choice)
+  }
+  readonly property color currentColor: root.swatchColor(root.value("color"))
 
   function value(key) {
     var v = root.look ? root.look[key] : undefined
@@ -84,7 +98,7 @@ Item {
       out[t.key] = t.options.indexOf(raw[t.key]) >= 0 ? raw[t.key] : root.defaults[t.key]
     }
     var c = String(raw.color || "")
-    out.color = c === "theme" || /^#[0-9a-fA-F]{6}$/.test(c) ? c : "theme"
+    out.color = c === "theme" || /^theme:[a-z_]+$/.test(c) || /^#[0-9a-fA-F]{6}$/.test(c) ? c : "theme"
     return out
   }
 
@@ -92,6 +106,7 @@ Item {
     return JSON.stringify({ agentsPet: 1, name: root.petName, look: root.withTrait("color", root.value("color")) })
   }
 
+  property string draftColor: ""
   property string toast: ""
   Timer { id: toastTimer; interval: 2200; onTriggered: root.toast = "" }
   function say(text) { root.toast = text; toastTimer.restart() }
@@ -142,7 +157,8 @@ Item {
           id: preview
           anchors.centerIn: parent
           size: Style.space(92)
-          look: root.look
+          look: root.draftColor !== "" ? root.withTrait("color", root.draftColor) : root.look
+          themePalette: root.themePalette
           trackGlobalCursor: true
         }
       }
@@ -230,7 +246,7 @@ Item {
     // ---------- Color ----------
     Column {
       width: parent.width
-      spacing: Style.space(5)
+      spacing: Style.space(6)
 
       SectionLabel { text: strings.t("pet.trait.color") }
 
@@ -248,9 +264,9 @@ Item {
             width: Style.space(26)
             height: Style.space(26)
             radius: width / 2
-            color: modelData === "theme" ? root.accent : modelData
-            border.width: selected ? 2 : 0
-            border.color: root.foreground
+            color: root.swatchColor(modelData)
+            border.width: selected ? 2 : 1
+            border.color: selected ? root.foreground : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.15)
 
             Text {
               visible: swatch.modelData === "theme"
@@ -264,23 +280,57 @@ Item {
             }
 
             MouseArea {
+              id: swatchMouse
               anchors.fill: parent
+              hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
               onClicked: root.setTrait("color", swatch.modelData)
             }
+
+            PanelToolTip {
+              visible: swatchMouse.containsMouse
+              text: swatch.modelData === "theme" ? strings.t("pet.color.accent") : swatch.modelData.slice(6).replace("_", " ")
+            }
           }
         }
+      }
 
-        TextField {
-          id: hexField
-          width: Style.space(96)
-          placeholderText: "#rrggbb"
-          maximumLength: 7
-          text: /^#/.test(root.value("color")) && root.swatches.indexOf(root.value("color")) < 0 ? root.value("color") : ""
-          onEditingFinished: {
-            var v = text.trim()
-            if (v !== "" && v[0] !== "#") v = "#" + v
-            if (/^#[0-9a-fA-F]{6}$/.test(v)) root.setTrait("color", v.toLowerCase())
+      // Custom color: saturation/value square, hue strip, and a hex field.
+      Row {
+        spacing: Style.space(8)
+
+        ColorPicker {
+          id: picker
+          width: Style.space(150)
+          height: Style.space(96)
+          color: root.currentColor
+          onPicking: function(hex) { root.draftColor = hex }
+          onPicked: function(hex) { root.draftColor = ""; root.setTrait("color", hex) }
+        }
+
+        Column {
+          spacing: Style.space(6)
+
+          Rectangle {
+            width: Style.space(96)
+            height: Style.space(28)
+            radius: Style.cornerRadius
+            color: root.draftColor !== "" ? root.draftColor : root.currentColor
+            border.width: 1
+            border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.2)
+          }
+
+          TextField {
+            id: hexField
+            width: Style.space(96)
+            placeholderText: "#rrggbb"
+            maximumLength: 7
+            text: root.draftColor !== "" ? root.draftColor : String(root.currentColor).slice(0, 7)
+            onEditingFinished: {
+              var v = text.trim()
+              if (v !== "" && v[0] !== "#") v = "#" + v
+              if (/^#[0-9a-fA-F]{6}$/.test(v)) root.setTrait("color", v.toLowerCase())
+            }
           }
         }
       }
@@ -413,6 +463,7 @@ Item {
       anchors.centerIn: parent
       size: Style.space(44)
       look: chip.look
+      themePalette: root.themePalette
       interactive: false
       animated: chipMouse.containsMouse
       lively: false

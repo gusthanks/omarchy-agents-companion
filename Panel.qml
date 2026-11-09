@@ -45,11 +45,14 @@ Panel {
 
   readonly property string companionName: String(petConfig.name || setting("companionName", "Kian")).trim() || "Kian"
   readonly property var petLook: petConfig.look || ({})
-  property var barPetLoaderRef: null
+  // Bar pet as a share of the bar's height (theme token size-horizontal), so a
+  // taller bar gets a bigger pet. The bar itself never grows for the pet.
+  readonly property real barPetSize: Math.round(Style.bar.sizeHorizontal * (petSize === "s" ? 0.7 : (petSize === "l" ? 0.96 : 0.85)))
   readonly property string petSize: ["s", "m", "l"].indexOf(petConfig.size) >= 0 ? petConfig.size : "m"
   readonly property real petHeroSize: Style.space(petSize === "s" ? 44 : (petSize === "l" ? 66 : 54))
   readonly property var petSaved: Array.isArray(petConfig.saved) ? petConfig.saved : []
   Commons.Translations { id: petStrings; directory: Qt.resolvedUrl("i18n") }
+  ThemePalette { id: petPalette }
   property bool petEditing: false
 
   // Merge a change into the pet config file and write it back.
@@ -96,14 +99,17 @@ Panel {
   // A subscription coming back from its cap is worth a little party.
   property var lastMaxed: []
   onMaxedProvidersChanged: {
+    var present = {}
+    for (var j = 0; j < providers.length; j++) present[providers[j].providerId || providers[j].providerName || String(j)] = true
     var back = false
-    for (var i = 0; i < lastMaxed.length; i++) if (maxedProviders.indexOf(lastMaxed[i]) < 0) back = true
+    for (var i = 0; i < lastMaxed.length; i++)
+      if (maxedProviders.indexOf(lastMaxed[i]) < 0 && present[lastMaxed[i]]) back = true
     lastMaxed = maxedProviders
     if (back) petCelebrate()
   }
 
   function petCelebrate() {
-    if (barPetLoaderRef && barPetLoaderRef.item) barPetLoaderRef.item.celebrate()
+    barPet.celebrate()
     var hero = panel.loadedContent ? panel.loadedContent.heroPet : null
     if (hero && root.opened) hero.celebrate()
   }
@@ -132,12 +138,28 @@ Panel {
     return total
   }
 
-  readonly property var currentInsight: deepInsights.length > 0 ? deepInsights[deepInsightIndex % deepInsights.length] : null
+  // The banner follows an insight by key, not by position: the list is rebuilt
+  // as records land and tips come and go, and indexing it would swap the line
+  // mid-read. Numbers inside the shown tip still update live.
+  property string shownInsightKey: ""
+  function insightIndex(key) {
+    for (var i = 0; i < deepInsights.length; i++) if (deepInsights[i].key === key) return i
+    return -1
+  }
+  readonly property var currentInsight: {
+    if (deepInsights.length === 0) return null
+    var i = insightIndex(shownInsightKey)
+    return deepInsights[i >= 0 ? i : 0]
+  }
+  function advanceInsight() {
+    if (deepInsights.length === 0) return
+    var i = insightIndex(shownInsightKey)
+    shownInsightKey = deepInsights[(i + 1) % deepInsights.length].key
+  }
   readonly property bool currentInsightIsAlert: !!(currentInsight && currentInsight.alert)
   readonly property string currentInsightBadge: currentInsight ? currentInsight.badge : ""
   readonly property string currentInsightIcon: currentInsight ? currentInsight.icon : ""
 
-  property int deepInsightIndex: 0
 
   readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
   readonly property color urgent: bar ? bar.urgent : Commons.Color.urgent
@@ -181,6 +203,7 @@ Panel {
     var rows = []
     var hero = []
     if (addButtonShown) hero.push({ kind: "add", index: 0 })
+    if (addStage === "") hero.push({ kind: "pet", index: 0 })
     if (addStage === "") hero.push({ kind: "launch", index: 0 })
     if (hero.length > 0) rows.push(hero)
     if (picking) {
@@ -395,7 +418,7 @@ Panel {
 
   function startAdd(label) {
     addPrivate = (addChecks[addProvider] || "") === "additional"
-    addStatus = Commons.I18n.t("agents.starting")
+    addStatus = petStrings.t("agents.starting")
     addCode = ""
     addUrl = ""
     // Claude's login offers pasting a code back whenever its page shows one,
@@ -421,7 +444,7 @@ Panel {
   function submitPaste(code) {
     if (!addProcess.running || code.trim() === "") return
     addProcess.write(code.trim() + "\n")
-    addStatus = Commons.I18n.t("agents.checkingCode")
+    addStatus = petStrings.t("agents.checkingCode")
   }
 
   // The add command's own lines are tagged; everything else is the CLI
@@ -462,9 +485,9 @@ Panel {
 
   // A few ways into making Omarchy your own, handed to the default agent.
   readonly property var starterPrompts: [
-    { glyph: "󰏘", label: Commons.I18n.t("agents.theme"), prompt: "Make me a new Omarchy theme. Ask me what look or inspiration I have in mind, then build it following the Omarchy skill's theming guide and switch to it." },
-    { glyph: "󰐱", label: Commons.I18n.t("agents.plugin"), prompt: "Make me a new Omarchy shell plugin. Ask me what I'd like it to do, then build it following the Omarchy skill's plugin guide and enable it." },
-    { glyph: "󰣆", label: Commons.I18n.t("agents.app"), prompt: "Make me a new app for my Omarchy desktop. Ask me what it should do, then build it following the omarchy-app skill and install it so it shows up in the app launcher." }
+    { glyph: "󰏘", label: petStrings.t("agents.theme"), prompt: "Make me a new Omarchy theme. Ask me what look or inspiration I have in mind, then build it following the Omarchy skill's theming guide and switch to it." },
+    { glyph: "󰐱", label: petStrings.t("agents.plugin"), prompt: "Make me a new Omarchy shell plugin. Ask me what I'd like it to do, then build it following the Omarchy skill's plugin guide and enable it." },
+    { glyph: "󰣆", label: petStrings.t("agents.app"), prompt: "Make me a new app for my Omarchy desktop. Ask me what it should do, then build it following the omarchy-app skill and install it so it shows up in the app launcher." }
   ]
 
   function startPrompt(prompt) {
@@ -509,6 +532,7 @@ Panel {
     else if (target.kind === "add") addStage !== "" ? cancelAdd() : addAccount()
     else if (target.kind === "choice") chooseAddProvider(addProviders[target.index].providerId)
     else if (target.kind === "launch") launchAgent()
+    else if (target.kind === "pet") petEditing = !petEditing
     else if (target.kind === "providerSignin") signInAgain(providers[target.index], null)
     else if (target.kind === "signin") signInAgain(pickedEntry.provider, pickedEntry.account)
     else if (target.kind === "autoswitch") setSwitchMode(pickedEntry.provider, autoSwitchFor(pickedEntry.provider) ? "manual" : "auto")
@@ -566,7 +590,7 @@ Panel {
     if (!supportsSignIn(p) || addStage === "running") return
     addProvider = p.providerId
     addPrivate = !!account && account.primary !== true
-    addStatus = Commons.I18n.t("agents.starting")
+    addStatus = petStrings.t("agents.starting")
     addCode = ""
     addUrl = ""
     // Claude's login offers pasting a code back whenever its page shows one,
@@ -585,19 +609,19 @@ Panel {
     var count = Number(credits.available)
     var expires = new Date(String(credits.nextExpiresAt || "")).getTime()
     if (isFinite(expires) && expires > nowMs) {
-      return Commons.I18n.tn("agents.freeResetsExpires", count)
+      return petStrings.tn("agents.freeResetsExpires", count)
         .arg(Commons.I18n.formatNumber(count)).arg(formatDuration(expires - nowMs))
     }
     return freeResetsText(count)
   }
 
   function freeResetsText(count) {
-    return Commons.I18n.tn("agents.freeResets", count).arg(Commons.I18n.formatNumber(count))
+    return petStrings.tn("agents.freeResets", count).arg(Commons.I18n.formatNumber(count))
   }
 
   function planLabel(p) {
     var tier = String(p && p.tierLabel || "")
-    if (tier === "Prepaid") return Commons.I18n.t("agents.tierPrepaid")
+    if (tier === "Prepaid") return petStrings.t("agents.tierPrepaid")
     return tier === "" ? "" : tier.charAt(0).toUpperCase() + tier.slice(1)
   }
 
@@ -721,53 +745,53 @@ Panel {
   }
 
   function formatDuration(ms) {
-    if (!(ms > 0)) return Commons.I18n.t("agents.durationNow")
+    if (!(ms > 0)) return petStrings.t("agents.durationNow")
     var minutes = Math.floor(ms / 60000)
     var hours = Math.floor(minutes / 60)
     var days = Math.floor(hours / 24)
-    if (days > 0) return Commons.I18n.t("agents.durationDaysHours").arg(Commons.I18n.formatNumber(days)).arg(Commons.I18n.formatNumber(hours % 24))
-    if (hours > 0) return Commons.I18n.t("agents.durationHoursMinutes").arg(Commons.I18n.formatNumber(hours)).arg(Commons.I18n.formatNumber(minutes % 60))
-    return Commons.I18n.t("agents.durationMinutes").arg(Commons.I18n.formatNumber(Math.max(1, minutes)))
+    if (days > 0) return petStrings.t("agents.durationDaysHours").arg(Commons.I18n.formatNumber(days)).arg(Commons.I18n.formatNumber(hours % 24))
+    if (hours > 0) return petStrings.t("agents.durationHoursMinutes").arg(Commons.I18n.formatNumber(hours)).arg(Commons.I18n.formatNumber(minutes % 60))
+    return petStrings.t("agents.durationMinutes").arg(Commons.I18n.formatNumber(Math.max(1, minutes)))
   }
 
   // Window titles stay English in the records, where scopedPart() and the
   // collectors match on them; only what reaches the screen is translated.
   function windowDisplayTitle(title) {
     var value = String(title || "")
-    if (value === "Session") return Commons.I18n.t("agents.windowSession")
-    if (value === "Weekly") return Commons.I18n.t("agents.windowWeekly")
-    if (value === "Monthly") return Commons.I18n.t("agents.windowMonthly")
-    if (value === "Spend limit") return Commons.I18n.t("agents.windowSpendLimit")
-    if (value === "Limit") return Commons.I18n.t("agents.windowLimit")
+    if (value === "Session") return petStrings.t("agents.windowSession")
+    if (value === "Weekly") return petStrings.t("agents.windowWeekly")
+    if (value === "Monthly") return petStrings.t("agents.windowMonthly")
+    if (value === "Spend limit") return petStrings.t("agents.windowSpendLimit")
+    if (value === "Limit") return petStrings.t("agents.windowLimit")
     var part = scopedPart(value)
-    if (part && part.window === "Session") return Commons.I18n.t("agents.modelSession").arg(part.model)
-    if (part && part.window === "Weekly") return Commons.I18n.t("agents.modelWeekly").arg(part.model)
-    if (part && part.window === "Monthly") return Commons.I18n.t("agents.modelMonthly").arg(part.model)
+    if (part && part.window === "Session") return petStrings.t("agents.modelSession").arg(part.model)
+    if (part && part.window === "Weekly") return petStrings.t("agents.modelWeekly").arg(part.model)
+    if (part && part.window === "Monthly") return petStrings.t("agents.modelMonthly").arg(part.model)
     return value
   }
 
   function scopedAllowanceText(scoped, windowTitle) {
     var percent = Commons.I18n.formatNumber(Math.round(scoped.percent * 100))
     var value = String(windowTitle || "")
-    if (value === "Session") return Commons.I18n.t("agents.scopedSession").arg(scoped.title).arg(percent)
-    if (value === "Weekly") return Commons.I18n.t("agents.scopedWeekly").arg(scoped.title).arg(percent)
-    if (value === "Monthly") return Commons.I18n.t("agents.scopedMonthly").arg(scoped.title).arg(percent)
-    return Commons.I18n.t("agents.scopedOther").arg(scoped.title).arg(percent).arg(windowDisplayTitle(value))
+    if (value === "Session") return petStrings.t("agents.scopedSession").arg(scoped.title).arg(percent)
+    if (value === "Weekly") return petStrings.t("agents.scopedWeekly").arg(scoped.title).arg(percent)
+    if (value === "Monthly") return petStrings.t("agents.scopedMonthly").arg(scoped.title).arg(percent)
+    return petStrings.t("agents.scopedOther").arg(scoped.title).arg(percent).arg(windowDisplayTitle(value))
   }
 
   // The collectors write a fixed English status; the ones that reach the
   // screen are shown in the current language.
   function statusDisplayText(status) {
     var value = String(status || "")
-    if (value === "Balance unavailable") return Commons.I18n.t("agents.balanceUnavailable")
-    if (value === "Out of credits") return Commons.I18n.t("agents.outOfCredits")
+    if (value === "Balance unavailable") return petStrings.t("agents.balanceUnavailable")
+    if (value === "Out of credits") return petStrings.t("agents.outOfCredits")
     var limits = value.match(/^(.+) limits unavailable$/)
-    if (limits) return Commons.I18n.t("agents.providerLimitsUnavailable").arg(limits[1])
+    if (limits) return petStrings.t("agents.providerLimitsUnavailable").arg(limits[1])
     var provider = value.match(/^(.+) unavailable$/)
-    if (provider) return Commons.I18n.t("agents.providerUnavailable").arg(provider[1])
-    if (value === "Sign-in expired") return Commons.I18n.t("agents.signInExpired")
-    if (value === "Waiting for auth") return Commons.I18n.t("agents.waitingForAuth")
-    if (value === "Limits paused") return Commons.I18n.t("agents.limitsPaused")
+    if (provider) return petStrings.t("agents.providerUnavailable").arg(provider[1])
+    if (value === "Sign-in expired") return petStrings.t("agents.signInExpired")
+    if (value === "Waiting for auth") return petStrings.t("agents.waitingForAuth")
+    if (value === "Limits paused") return petStrings.t("agents.limitsPaused")
     return value
   }
 
@@ -778,21 +802,21 @@ Panel {
     var value = String(text || "")
     switch (value) {
     case "Run `claude auth login` to restore authoritative usage.":
-      return Commons.I18n.t("agents.helpRunToRestoreUsage").arg("`claude auth login`")
+      return petStrings.t("agents.helpRunToRestoreUsage").arg("`claude auth login`")
     case "Run `codex login` to authenticate.":
-      return Commons.I18n.t("agents.helpRunToAuthenticate").arg("`codex login`")
+      return petStrings.t("agents.helpRunToAuthenticate").arg("`codex login`")
     case "Start Grok, or run `grok login`, to sign in.":
-      return Commons.I18n.t("agents.helpStartOrRunToSignIn").arg("Grok").arg("`grok login`")
+      return petStrings.t("agents.helpStartOrRunToSignIn").arg("Grok").arg("`grok login`")
     case "Start Grok to see its limits; signing in again is not needed.":
-      return Commons.I18n.t("agents.helpStartToSeeLimits").arg("Grok")
+      return petStrings.t("agents.helpStartToSeeLimits").arg("Grok")
     case "Grok's saved sign-in expired. Start Grok to refresh it.":
-      return Commons.I18n.t("agents.helpSignInExpired").arg("Grok")
+      return petStrings.t("agents.helpSignInExpired").arg("Grok")
     case "Set FIREWORKS_API_KEY, run `firectl set-api-key`, or sign in to Fireworks in pi or opencode.":
-      return Commons.I18n.t("agents.helpFireworksSignIn").arg("FIREWORKS_API_KEY").arg("`firectl set-api-key`")
+      return petStrings.t("agents.helpFireworksSignIn").arg("FIREWORKS_API_KEY").arg("`firectl set-api-key`")
     case "codex not found in PATH":
-      return Commons.I18n.t("agents.helpNotInPath").arg("codex")
+      return petStrings.t("agents.helpNotInPath").arg("codex")
     case "Fireworks usage scan failed":
-      return Commons.I18n.t("agents.helpScanFailed").arg("Fireworks")
+      return petStrings.t("agents.helpScanFailed").arg("Fireworks")
     }
     return value
   }
@@ -827,8 +851,8 @@ Panel {
     var spent = formatMoney(b.spent, b.currency)
     var funded = formatMoney(b.funded, b.currency)
     return b.estimated
-      ? Commons.I18n.t("agents.balanceSpentEstimated").arg(spent).arg(funded)
-      : Commons.I18n.t("agents.balanceSpent").arg(spent).arg(funded)
+      ? petStrings.t("agents.balanceSpentEstimated").arg(spent).arg(funded)
+      : petStrings.t("agents.balanceSpent").arg(spent).arg(funded)
   }
 
   // ---------------------------------------------------------------- summary
@@ -869,16 +893,16 @@ Panel {
     }
 
     var phrases = []
-    if (week > 0) phrases.push(Commons.I18n.tn("agents.tokensThisWeek", week).arg(usage.formatTokenCount(week)))
-    if (today > 0) phrases.push(Commons.I18n.tn("agents.tokensToday", today).arg(usage.formatTokenCount(today)))
+    if (week > 0) phrases.push(petStrings.tn("agents.tokensThisWeek", week).arg(usage.formatTokenCount(week)))
+    if (today > 0) phrases.push(petStrings.tn("agents.tokensToday", today).arg(usage.formatTokenCount(today)))
     var topModel = ""
     for (var model in byModel) if (topModel === "" || byModel[model] > byModel[topModel]) topModel = model
-    if (topModel !== "" && byModel[topModel] > 0) phrases.push(Commons.I18n.t("agents.mostlyModel").arg(topModel))
+    if (topModel !== "" && byModel[topModel] > 0) phrases.push(petStrings.t("agents.mostlyModel").arg(topModel))
     var busiest = ""
     for (var date in byDay) if (busiest === "" || byDay[date] > byDay[busiest]) busiest = date
-    if (busiest !== "" && byDay[busiest] > 0) phrases.push(Commons.I18n.t("agents.busiestDay").arg(dayName(busiest)))
-    if (prompts > 0) phrases.push(Commons.I18n.tn("agents.promptsToday", prompts).arg(Commons.I18n.formatNumber(prompts)))
-    if (sessions > 0) phrases.push(Commons.I18n.tn("agents.sessionsToday", sessions).arg(Commons.I18n.formatNumber(sessions)))
+    if (busiest !== "" && byDay[busiest] > 0) phrases.push(petStrings.t("agents.busiestDay").arg(dayName(busiest)))
+    if (prompts > 0) phrases.push(petStrings.tn("agents.promptsToday", prompts).arg(Commons.I18n.formatNumber(prompts)))
+    if (sessions > 0) phrases.push(petStrings.tn("agents.sessionsToday", sessions).arg(Commons.I18n.formatNumber(sessions)))
     return phrases
   }
   // Tips shown in the banner: live insights from usage first, then a
@@ -900,7 +924,10 @@ Panel {
       totalTokens += Number(p.todayTotalTokens || 0)
       totalSessions += Number(p.todaySessions || 0)
       if (p.todayTokensByModel) {
-        for (var m in p.todayTokensByModel) byModel[m] = (byModel[m] || 0) + Number(p.todayTokensByModel[m] || 0)
+        for (var m in p.todayTokensByModel) {
+          var mName = usage.friendlyModelName ? usage.friendlyModelName(m) : m
+          byModel[mName] = (byModel[mName] || 0) + Number(p.todayTokensByModel[m] || 0)
+        }
       }
       var wins = root.limitWindows(p)
       var peak = -1
@@ -917,18 +944,19 @@ Panel {
 
     // Limits
     if (worst && worst.percent >= 1) {
-      list.push({ badge: t.t("tip.badge.limit"), icon: "⚠️", alert: true,
-        phrase: (worst.resetMs > 0 ? t.t("tip.limitMaxed") : t.t("tip.limitMaxedNoReset"))
-          .arg(worst.provider).arg(worst.title).arg(root.formatDuration(worst.resetMs)) })
+      list.push({ key: "limit", badge: t.t("tip.badge.limit"), icon: "⚠️", alert: true,
+        phrase: worst.resetMs > 0
+          ? t.t("tip.limitMaxed").arg(worst.provider).arg(worst.title).arg(root.formatDuration(worst.resetMs))
+          : t.t("tip.limitMaxedNoReset").arg(worst.provider).arg(worst.title) })
     } else if (worst && worst.percent >= 0.9) {
-      list.push({ badge: t.t("tip.badge.limit"), icon: "⚠️", alert: true,
+      list.push({ key: "limit", badge: t.t("tip.badge.limit"), icon: "⚠️", alert: true,
         phrase: t.t("tip.limitNear").arg(worst.provider).arg(worst.title).arg(pctText(worst.percent)) })
     } else if (worst) {
-      list.push({ badge: t.t("tip.badge.limits"), icon: "✓",
+      list.push({ key: "limit", badge: t.t("tip.badge.limits"), icon: "✓",
         phrase: t.t("tip.limitsHealthy").arg(worst.provider).arg(worst.title).arg(pctText(worst.percent)) })
     }
     if (worst && worst.percent >= 0.9 && calmest && calmest.provider !== worst.provider && calmest.percent < 0.5) {
-      list.push({ badge: t.t("tip.badge.switch"), icon: "↻",
+      list.push({ key: "switch", badge: t.t("tip.badge.switch"), icon: "↻",
         phrase: t.t("tip.switchProvider").arg(calmest.provider).arg(pctText(calmest.percent)) })
     }
 
@@ -936,32 +964,29 @@ Panel {
     if (totalTokens > 0 && usage && usage.formatTokenCount) {
       var top = ""
       for (var name in byModel) if (top === "" || byModel[name] > byModel[top]) top = name
-      list.push({ badge: t.t("tip.badge.today"), icon: "⚡",
+      list.push({ key: "today", badge: t.t("tip.badge.today"), icon: "⚡",
         phrase: top !== "" ? t.t("tip.tokensTodayTop").arg(usage.formatTokenCount(totalTokens)).arg(top)
                            : t.t("tip.tokensToday").arg(usage.formatTokenCount(totalTokens)) })
       if (totalSessions > 0) {
-        list.push({ badge: t.t("tip.badge.pace"), icon: "⏱️",
-          phrase: t.t("tip.pace").arg(usage.formatTokenCount(Math.round(totalTokens / totalSessions))).arg(Commons.I18n.formatNumber(totalSessions)) })
+        list.push({ key: "pace", badge: t.t("tip.badge.pace"), icon: "⏱️",
+          phrase: t.tn("tip.pace", totalSessions).arg(usage.formatTokenCount(Math.round(totalTokens / totalSessions))).arg(Commons.I18n.formatNumber(totalSessions)) })
       }
     }
 
     // Late night
     var hour = new Date(root.nowMs).getHours()
-    if (hour >= 23 || hour < 5) list.push({ badge: t.t("tip.badge.night"), icon: "🌙", phrase: t.t("tip.lateNight") })
+    if (hour >= 23 || hour < 5) list.push({ key: "night", badge: t.t("tip.badge.night"), icon: "🌙", phrase: t.t("tip.lateNight") })
 
     // General advice
     for (var k = 1; k <= root.staticTipCount; k++) {
-      list.push({ badge: t.t("tip.badge.tip"), icon: "💡", phrase: t.t("tip.general." + k) })
+      list.push({ key: "general." + k, badge: t.t("tip.badge.tip"), icon: "💡", phrase: t.t("tip.general." + k) })
     }
     return list
   }
 
   function showNextInsight() {
-    if (deepInsights.length > 0) {
-      deepInsightIndex = (deepInsightIndex + 1) % deepInsights.length
-      var ins = deepInsights[deepInsightIndex]
-      shownPhrase = ins.phrase
-    }
+    advanceInsight()
+    if (currentInsight) shownPhrase = currentInsight.phrase
   }
 
 
@@ -972,12 +997,11 @@ Panel {
   property string shownPhrase: ""
   readonly property string heroPhrase: addStage !== "" || blankSlate
     ? addHeading
-    : (shownPhrase !== "" ? shownPhrase : Commons.I18n.t("agents.subscriptions"))
+    : (shownPhrase !== "" ? shownPhrase : petStrings.t("agents.subscriptions"))
 
   function showPhrase() {
     if (deepInsights.length > 0) {
-      var ins = deepInsights[deepInsightIndex % deepInsights.length]
-      shownPhrase = ins.phrase
+      shownPhrase = currentInsight ? currentInsight.phrase : ""
     } else {
       var n = summaryPhrases.length
       shownPhrase = n > 0 ? summaryPhrases[phraseIndex % n] : ""
@@ -1007,7 +1031,7 @@ Panel {
     for (var i = 0; i < providers.length; i++) {
       var count = Number(providers[i].syncDeviceCount || 0)
       if (providers[i].syncEnabled && count > 0)
-        return Commons.I18n.tn("agents.merged", count).arg(Commons.I18n.formatNumber(count))
+        return petStrings.tn("agents.merged", count).arg(Commons.I18n.formatNumber(count))
     }
     return ""
   }
@@ -1059,8 +1083,8 @@ Panel {
 
   // Adding takes over the hero's line, and the cursor starts over.
   readonly property string addHeading: picking || addProvider === ""
-    ? Commons.I18n.t("agents.addAccount")
-    : Commons.I18n.t("agents.addProviderAccount").arg(addProviderName(addProvider))
+    ? petStrings.t("agents.addAccount")
+    : petStrings.t("agents.addProviderAccount").arg(addProviderName(addProvider))
   onAddStageChanged: {
     phraseSwap.stop()
     if (hero) hero.metaOpacity = 1.0
@@ -1122,7 +1146,7 @@ Panel {
     stdout: SplitParser { onRead: function(line) { root.handleAddLine(line) } }
     onExited: {
       if (root.addStage === "running") {
-        root.addResult = Commons.I18n.t("agents.signInUnfinished")
+        root.addResult = petStrings.t("agents.signInUnfinished")
         root.addStage = "error"
       }
     }
@@ -1158,7 +1182,7 @@ Panel {
     }
     ScriptAction {
       script: {
-        root.deepInsightIndex = (root.deepInsightIndex + 1) % Math.max(1, root.deepInsights.length)
+        root.advanceInsight()
         root.showPhrase()
       }
     }
@@ -1186,25 +1210,14 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
+    // An empty square keeps the bar's icon slot; the pet is drawn on top of
+    // the button below, outside the bar's icon fitting, so it can fill the
+    // bar height instead of being shrunk to a 12px glyph.
     iconComponent: Component {
       Rectangle {
-        // A transparent box gives the bar's icon fitting a full-square bound.
         color: "transparent"
         width: Style.bar.iconCanvas
         height: Style.bar.iconCanvas
-
-        Loader {
-          id: barPetLoader
-          anchors.fill: parent
-          Component.onCompleted: root.barPetLoaderRef = barPetLoader
-          sourceComponent: BlobAvatar {
-            size: Style.bar.iconCanvas
-            look: root.petLook
-            mood: root.petMood
-            interactive: false
-            animated: false
-          }
-        }
       }
     }
     onPressed: function(buttonCode) {
@@ -1212,6 +1225,19 @@ Panel {
       else if (buttonCode === Qt.MiddleButton) root.refreshNow()
       else root.toggle()
     }
+  }
+
+  BlobAvatar {
+    id: barPet
+    anchors.centerIn: button
+    size: root.barPetSize
+    look: root.petLook
+    themePalette: petPalette
+    mood: root.petMood
+    interactive: false
+    animated: false
+    showMarks: false
+    particles: false
   }
 
   KeyboardPanel {
@@ -1297,6 +1323,9 @@ Panel {
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
               size: root.petHeroSize
+              animated: root.opened
+              lively: root.opened
+              themePalette: petPalette
               mood: root.petMood
               foreground: root.foreground
               accentColor: Commons.Color.accent
@@ -1333,12 +1362,12 @@ Panel {
                   if (root.addStage !== "") return root.addHeading.toUpperCase()
                   if (!usage || !usage.formatTokenCount) return ""
                   if (root.totalTokensToday > 0) {
-                    return Commons.I18n.tn("agents.tokensToday", root.totalTokensToday).arg(usage.formatTokenCount(root.totalTokensToday)).toUpperCase()
+                    return petStrings.tn("agents.tokensToday", root.totalTokensToday).arg(usage.formatTokenCount(root.totalTokensToday)).toUpperCase()
                   }
                   if (root.totalTokensWeek > 0) {
-                    return Commons.I18n.tn("agents.tokensThisWeek", root.totalTokensWeek).arg(usage.formatTokenCount(root.totalTokensWeek)).toUpperCase()
+                    return petStrings.tn("agents.tokensThisWeek", root.totalTokensWeek).arg(usage.formatTokenCount(root.totalTokensWeek)).toUpperCase()
                   }
-                  return Commons.I18n.tn("agents.tokensToday", 0).arg(usage.formatTokenCount(0)).toUpperCase()
+                  return petStrings.tn("agents.tokensToday", 0).arg(usage.formatTokenCount(0)).toUpperCase()
                 }
                 color: root.dim
                 font.family: root.fontFamily
@@ -1359,6 +1388,8 @@ Panel {
 
               HeroButton {
                 visible: root.addStage === ""
+                hasCursor: root.hasKey("pet")
+                onHovered: root.pointAt("pet")
                 glyph: root.petEditing ? "󰅖" : "󰒓"
                 tooltip: petStrings.t("pet.edit")
                 onClicked: root.petEditing = !root.petEditing
@@ -1370,7 +1401,7 @@ Panel {
                 onHovered: root.pointAt("add")
                 readonly property bool adding: root.addStage !== ""
                 glyph: adding ? "󰅖" : "󰐕"
-                tooltip: adding ? Commons.I18n.t("agents.backToLimits") : Commons.I18n.t("agents.addSubscription")
+                tooltip: adding ? petStrings.t("agents.backToLimits") : petStrings.t("agents.addSubscription")
                 onClicked: adding ? root.cancelAdd() : root.addAccount()
               }
 
@@ -1379,7 +1410,7 @@ Panel {
                 hasCursor: root.hasKey("launch")
                 onHovered: root.pointAt("launch")
                 glyph: "󰞷"
-                tooltip: Commons.I18n.t("agents.startDefaultAgent")
+                tooltip: petStrings.t("agents.startDefaultAgent")
                 onClicked: root.launchAgent()
               }
             }
@@ -1513,6 +1544,7 @@ Panel {
             petName: root.petConfig.name || ""
             petSize: root.petSize
             saved: root.petSaved
+            themePalette: petPalette
             foreground: root.foreground
             dim: root.dim
             fontFamily: root.fontFamily
@@ -1571,7 +1603,7 @@ Panel {
     Text {
       visible: root.blankSlate && root.picking
       width: parent.width
-      text: Commons.I18n.t("agents.signInIntro")
+      text: petStrings.t("agents.signInIntro")
       textFormat: Text.PlainText
       color: root.dim
       font.family: root.fontFamily
@@ -1644,7 +1676,7 @@ Panel {
 
       Text {
         width: parent.width
-        text: Commons.I18n.t("agents.nameAccount")
+        text: petStrings.t("agents.nameAccount")
         textFormat: Text.PlainText
         color: root.dim
         font.family: root.fontFamily
@@ -1655,7 +1687,7 @@ Panel {
       TextField {
         id: addNameField
         width: parent.width
-        placeholderText: Commons.I18n.t("agents.placeholderWork")
+        placeholderText: petStrings.t("agents.placeholderWork")
         foreground: root.foreground
         font.family: root.fontFamily
         font.pixelSize: Style.font.body
@@ -1687,7 +1719,7 @@ Panel {
         spacing: Style.space(4)
 
         Text {
-          text: Commons.I18n.t("agents.confirmCode")
+          text: petStrings.t("agents.confirmCode")
           textFormat: Text.PlainText
           color: root.dim
           font.family: root.fontFamily
@@ -1712,7 +1744,7 @@ Panel {
 
         Text {
           width: parent.width
-          text: Commons.I18n.t("agents.pasteCode")
+          text: petStrings.t("agents.pasteCode")
           textFormat: Text.PlainText
           color: root.dim
           font.family: root.fontFamily
@@ -1723,7 +1755,7 @@ Panel {
         TextField {
           id: pasteField
           width: parent.width
-          placeholderText: Commons.I18n.t("agents.placeholderCode")
+          placeholderText: petStrings.t("agents.placeholderCode")
           foreground: root.foreground
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
@@ -1734,7 +1766,7 @@ Panel {
 
       TextLink {
         visible: root.addUrl !== ""
-        text: Commons.I18n.t("agents.reopenSignIn")
+        text: petStrings.t("agents.reopenSignIn")
         onClicked: root.reopenSignIn()
       }
     }
@@ -1848,9 +1880,9 @@ Panel {
     TextLink {
       visible: !section.multi && root.needsSignIn(section.provider)
       picked: root.hasKey("providerSignin", section.providerIndex)
-      text: Commons.I18n.t("agents.signInRequired")
+      text: petStrings.t("agents.signInRequired")
       idleColor: root.urgent
-      tooltip: Commons.I18n.t("agents.signInAgainProvider").arg(section.provider ? section.provider.providerName : "")
+      tooltip: petStrings.t("agents.signInAgainProvider").arg(section.provider ? section.provider.providerName : "")
       onClicked: root.signInAgain(section.provider, null)
     }
 
@@ -1899,7 +1931,7 @@ Panel {
           textFormat: Text.PlainText
           width: parent.width * 0.3
           anchors.verticalCenter: parent.verticalCenter
-          text: Commons.I18n.t("agents.balance")
+          text: petStrings.t("agents.balance")
           color: root.foreground
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
@@ -2064,7 +2096,7 @@ Panel {
 
     PanelToolTip {
       visible: tileMouse.containsMouse
-      text: Commons.I18n.t("agents.startOnNew").arg(tile.title.toLowerCase())
+      text: petStrings.t("agents.startOnNew").arg(tile.title.toLowerCase())
     }
   }
 
@@ -2270,9 +2302,9 @@ Panel {
           id: signInLink
           visible: root.needsSignIn(head.account)
           picked: head.pickedKind === "signin"
-          text: Commons.I18n.t("agents.signInRequired")
+          text: petStrings.t("agents.signInRequired")
           idleColor: root.urgent
-          tooltip: Commons.I18n.t("agents.signInAgainAccount")
+          tooltip: petStrings.t("agents.signInAgainAccount")
           onClicked: root.signInAgain(head.owner, head.account)
         }
       }
@@ -2308,7 +2340,7 @@ Panel {
         id: headActive
         visible: head.isActive
         anchors.right: parent.right
-        text: Commons.I18n.t("agents.active")
+        text: petStrings.t("agents.active")
         textFormat: Text.PlainText
         color: Commons.Color.accent
         font.family: root.fontFamily
@@ -2328,19 +2360,19 @@ Panel {
 
         TextLink {
           visible: head.autoOn || useHover.hovered || head.picked
-          text: Commons.I18n.t("agents.autoswitch") + (head.pickedKind === "autoswitch" ? " ⏎" : "")
+          text: petStrings.t("agents.autoswitch") + (head.pickedKind === "autoswitch" ? " ⏎" : "")
           picked: head.pickedKind === "autoswitch"
           current: head.autoOn
           tooltip: head.autoOn
-            ? Commons.I18n.t("agents.stopAutoSwitch")
-            : Commons.I18n.t("agents.switchAutoAt").arg(Commons.I18n.formatNumber(root.switchThreshold(head.owner)))
+            ? petStrings.t("agents.stopAutoSwitch")
+            : petStrings.t("agents.switchAutoAt").arg(Commons.I18n.formatNumber(root.switchThreshold(head.owner)))
           onClicked: root.setSwitchMode(head.owner, head.autoOn ? "manual" : "auto")
         }
 
         // With Autoswitch on, Use waits until the line is hovered or picked.
         TextLink {
           visible: !head.autoOn || useHover.hovered || head.picked
-          text: Commons.I18n.t("agents.use") + (head.pickedKind === "account" ? " ⏎" : "")
+          text: petStrings.t("agents.use") + (head.pickedKind === "account" ? " ⏎" : "")
           picked: head.pickedKind === "account"
           onClicked: root.useAccount(head.owner, head.account)
         }
@@ -2395,13 +2427,13 @@ Panel {
           var windowName = root.windowDisplayTitle(compact.window.title)
           var used = Commons.I18n.formatNumber(Math.round(compact.window.percent * 100))
           lines.push(compact.resetMs > 0
-            ? Commons.I18n.t("agents.windowUsedResets").arg(windowName).arg(used).arg(root.formatDuration(compact.resetMs))
-            : Commons.I18n.t("agents.windowUsed").arg(windowName).arg(used))
+            ? petStrings.t("agents.windowUsedResets").arg(windowName).arg(used).arg(root.formatDuration(compact.resetMs))
+            : petStrings.t("agents.windowUsed").arg(windowName).arg(used))
         }
         if (compact.stale)
           lines.push(compact.fetchedAt > 0 && root.nowMs - compact.fetchedAt > 60000
-            ? Commons.I18n.t("agents.lastUpdatedAgo").arg(root.formatDuration(root.nowMs - compact.fetchedAt))
-            : compact.fetchedAt > 0 ? Commons.I18n.t("agents.lastUpdatedJustNow") : Commons.I18n.t("agents.lastUpdatedUnknown"))
+            ? petStrings.t("agents.lastUpdatedAgo").arg(root.formatDuration(root.nowMs - compact.fetchedAt))
+            : compact.fetchedAt > 0 ? petStrings.t("agents.lastUpdatedJustNow") : petStrings.t("agents.lastUpdatedUnknown"))
         for (var i = 0; i < compact.scoped.length; i++)
           lines.push(root.scopedAllowanceText(compact.scoped[i], compact.window ? compact.window.title : ""))
         return lines.join("\n")

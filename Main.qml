@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 
 // The display side of agent usage. All extraction lives behind
 // omarchy-agent-usage-update, which writes one JSON record per agent into
@@ -10,6 +11,10 @@ import qs.Commons
 Item {
   id: root
   visible: false
+
+  // Strings come from this plugin's own catalog (copied from Omarchy's
+  // agents.* keys), so an Omarchy update renaming them cannot break the panel.
+  Commons.Translations { id: agentStrings; directory: Qt.resolvedUrl("i18n") }
 
   property var settings: ({})
 
@@ -411,7 +416,7 @@ Item {
     onRunningChanged: root.updateSyncRunning()
     onExited: function(exitCode) {
       if (exitCode !== 0) {
-        if (root.syncConfigured()) root.syncStatusText = I18n.t("agents.syncMkdirFailed")
+        if (root.syncConfigured()) root.syncStatusText = agentStrings.t("agents.syncMkdirFailed")
         root.finishSyncRun()
         return
       }
@@ -424,7 +429,7 @@ Item {
     running: false
     onRunningChanged: root.updateSyncRunning()
     onExited: function(exitCode) {
-      if (exitCode !== 0 && root.syncConfigured()) root.syncStatusText = I18n.t("agents.syncScanFailed")
+      if (exitCode !== 0 && root.syncConfigured()) root.syncStatusText = agentStrings.t("agents.syncScanFailed")
       root.finishSyncRun()
     }
 
@@ -818,7 +823,7 @@ Item {
   // (`claude-opus-4-8`, `gpt-5.6-sol`). Rejoin the numeric run into one
   // version and title-case the words around it.
   function friendlyModelName(id) {
-    if (!id) return I18n.t("agents.unknownModel")
+    if (!id) return agentStrings.t("agents.unknownModel")
     var name = String(id).replace(/^claude-/, "").replace(/-\d{8}$/, "")
     var parts = name.split("-")
     var words = []
@@ -837,6 +842,6 @@ Item {
       words.push(modelWordCase(part))
     }
     if (version.length > 0) words.push(version.join("."))
-    return words.length > 0 ? words.join(" ") : I18n.t("agents.unknownModel")
+    return words.length > 0 ? words.join(" ") : agentStrings.t("agents.unknownModel")
   }
 }
