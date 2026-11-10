@@ -452,7 +452,7 @@ ShellRoot {
       // Close to the real capture rate (~8-10 fps), so wall-clock animations
       // (wobble, particles) keep about their speed in the GIF.
       readonly property int frameMs: 100
-      readonly property int total: 280
+      readonly property int total: 124
       property real startMs: 0
 
       function moveCursor(t) {
@@ -469,26 +469,21 @@ ShellRoot {
         cursor.y = 10 + (scene.height / 2 - 60 - 10) * t
       }
 
+      // About 12 s: the best moments of the pet, kept short for the README.
       function step(f) {
-        if (f < 40) { scene.caption = "follows your cursor"; cursor.visible = true; moveCursor(f / 40) }
-        else if (f === 40) { cursor.visible = false; scene.caption = "pat it"; gifPet.pat() }
-        else if (f === 48 || f === 56) gifPet.pat()
-        else if (f === 68) { scene.caption = "worried when a limit is close"; gifPet.mood = "worried" }
-        else if (f === 84) { scene.caption = "...and a party when it comes back"; gifPet.mood = "normal"; gifPet.celebrate() }
-        else if (f === 104) { scene.caption = "thinks while your usage refreshes"; gifPet.play("thinking") }
-        else if (f === 126) gifPet.stop("thinking")
-        else if (f >= 130 && f <= 133) { scene.caption = "startled by a sudden cursor"; cursor.visible = true; rushCursor((f - 130) / 3)
-          if (f === 133) gifPet.play("startle") }
-        else if (f === 146) { cursor.visible = false; scene.caption = "too many pats make it dizzy" }
-        else if (f >= 148 && f <= 155) gifPet.pat()
-        else if (f === 182) { scene.caption = "a wink now and then"; gifPet.play("wink") }
-        else if (f === 194) { scene.caption = "yawns and dozes off"; gifPet.play("yawn", { next: "__sleep" }) }
-        else if (f === 228) { scene.caption = "a pat wakes it with a stretch"; gifPet.pat() }
-        else if (f === 246) { scene.caption = "make it yours"; scene.look = withLook({ accessory: "hat" }) }
-        else if (f === 253) scene.look = withLook({ body: "ghost", accessory: "bow", color: "theme:magenta" })
-        else if (f === 260) scene.look = withLook({ body: "squircle", eyes: "pixel", extra: "ears", accessory: "none", color: "theme:blue" })
-        else if (f === 267) scene.look = withLook({ body: "drop", eyes: "googly", extra: "leaf", color: "theme:yellow" })
-        else if (f === 274) { scene.look = shell.petLook; scene.caption = "" }
+        if (f < 16) { scene.caption = "follows your cursor"; cursor.visible = true; moveCursor(f / 16) }
+        else if (f === 16) { cursor.visible = false; scene.caption = "pat it"; gifPet.pat() }
+        else if (f === 22 || f === 28) gifPet.pat()
+        else if (f === 36) { scene.caption = "a party when a limit comes back"; gifPet.celebrate() }
+        else if (f >= 52 && f <= 55) { scene.caption = "startled by a sudden cursor"; cursor.visible = true; rushCursor((f - 52) / 3)
+          if (f === 55) gifPet.play("startle") }
+        else if (f === 64) { cursor.visible = false; scene.caption = "too many pats make it dizzy" }
+        else if (f >= 65 && f <= 72) gifPet.pat()
+        else if (f === 88) { scene.caption = "yawns and dozes off"; gifPet.play("yawn", { next: "__sleep" }) }
+        else if (f === 108) { scene.caption = "make it yours"; scene.look = withLook({ accessory: "hat" }) }
+        else if (f === 112) scene.look = withLook({ body: "ghost", accessory: "bow", color: "theme:magenta" })
+        else if (f === 116) scene.look = withLook({ body: "squircle", eyes: "pixel", extra: "ears", accessory: "none", color: "theme:blue" })
+        else if (f === 120) scene.look = withLook({ body: "drop", eyes: "googly", extra: "leaf", color: "theme:yellow" })
       }
 
       function withLook(patch) {
