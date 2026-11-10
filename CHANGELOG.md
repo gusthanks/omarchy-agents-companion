@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.1.1 (2026-11-09)
+
+### Panel
+
+- Hero layout: the pet is centered against the name, token count and tip line, which now
+  sit together as one block; the tip line spans to the panel's edge.
+
+### Docs and license
+
+- `LICENSE` is the plain MIT text again (GitHub detects it), with the upstream Omarchy
+  copyright line kept; the manifest author is "Gustavo Costa (gusthx)".
+- README reorganized (Install / update / uninstall, Use, Configuration, Privacy,
+  Development, Changes, Credits, License) and translated to Brazilian Portuguese in
+  `README.pt-BR.md`.
+- `docs/demo.gif` is shorter (about 12 s): cursor, pats, party, startle, dizzy, dozing off
+  and a few looks.
+
 ## 2.1.0 (2026-11-09)
 
 ### Reactions
@@ -44,7 +61,6 @@
 
 - The tip box is now one line under the pet's name: hover it to read the whole tip, › for
   the next one. Limit alerts stay red.
-- The hero pet is centered on the name, token count and tip line.
 
 ### Development
 
