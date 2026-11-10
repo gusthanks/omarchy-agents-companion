@@ -3,7 +3,7 @@
   "id": "gusthx.agents-pet",
   "name": "Agents Pet",
   "version": "2.1.0",
-  "author": "Gustavo Costa",
+  "author": "Gustavo Costa (gusthx)",
   "license": "MIT",
   "description": "A customizable flat pet for your Omarchy bar that follows your cursor and shares calm tips about your AI-agent usage, on top of the stock Agents panel.",
   "kinds": [
