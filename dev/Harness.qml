@@ -137,6 +137,7 @@ ShellRoot {
       spacing: 10
       readonly property var rows: [
         { label: "body", key: "body", options: ["blob", "orb", "squircle", "drop", "ghost"] },
+        { label: "", key: "body", options: ["cloud", "egg", "mochi", "bean"] },
         { label: "eyes", key: "eyes", options: ["capsule", "dot", "googly", "pixel", "sleepy"] },
         { label: "head", key: "extra", options: ["none", "antenna", "leaf", "ears", "horns"] },
         { label: "accessory", key: "accessory", options: ["glasses", "hat", "beanie", "bow", "flower"] }
@@ -218,7 +219,7 @@ ShellRoot {
   // Mock saved pets for the editor captures (never written anywhere).
   readonly property var mockSaved: [
     { name: shell.petName, look: shell.petLook },
-    { name: "Mochi", look: { body: "ghost", eyes: "googly", color: "theme:magenta", accessory: "bow" } },
+    { name: "Mochi", look: { body: "mochi", eyes: "googly", color: "theme:magenta", accessory: "bow" } },
     { name: "Byte", look: { body: "squircle", eyes: "pixel", color: "theme:blue", extra: "antenna" } },
     { name: "Fern", look: { body: "drop", eyes: "sleepy", mouth: "smile", color: "theme:green", extra: "leaf" } },
     { name: "Ozzy", look: { body: "orb", eyes: "dot", mouth: "cat", style: "outline", color: "theme:yellow", extra: "ears" } },
@@ -248,7 +249,7 @@ ShellRoot {
         themePalette: themeColors
         tab: parent.tabIndex
         Component.onCompleted: {
-          var cursor = [{ kind: "pet.body", index: 3 }, { kind: "pet.eyes", index: 2 }, { kind: "pet.accessory", index: 4 },
+          var cursor = [{ kind: "pet.body", index: 7 }, { kind: "pet.eyes", index: 2 }, { kind: "pet.accessory", index: 4 },
                         { kind: "pet.swatch", index: 5 }, { kind: "pet.card", index: 1 }][tab]
           keyTarget = cursor
           syncTryOn(cursor)

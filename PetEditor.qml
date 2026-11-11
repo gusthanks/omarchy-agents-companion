@@ -67,7 +67,7 @@ Item {
   readonly property var defaults: ({ body: "blob", eyes: "capsule", mouth: "none", extra: "none", accessory: "none", cheeks: true, style: "solid", color: "theme" })
 
   readonly property var traits: [
-    { key: "body", options: ["blob", "orb", "squircle", "drop", "ghost"] },
+    { key: "body", options: ["blob", "orb", "squircle", "drop", "ghost", "cloud", "egg", "mochi", "bean"] },
     { key: "eyes", options: ["capsule", "dot", "googly", "pixel", "sleepy"] },
     { key: "mouth", options: ["none", "smile", "o", "cat", "flat"] },
     { key: "extra", options: ["none", "antenna", "leaf", "ears", "horns"] },
@@ -81,7 +81,7 @@ Item {
   }
 
   readonly property var optionLabels: ({
-    body: { blob: "Blob", orb: "Orb", squircle: "Squircle", drop: "Drop", ghost: "Ghost" },
+    body: { blob: "Blob", orb: "Orb", squircle: "Squircle", drop: "Drop", ghost: "Ghost", cloud: "Cloud", egg: "Egg", mochi: "Mochi", bean: "Bean" },
     eyes: { capsule: "Capsule", dot: "Dots", googly: "Googly", pixel: "Pixel", sleepy: "Sleepy" },
     mouth: { none: "None", smile: "Smile", o: "Surprised", cat: "Cat", flat: "Flat" },
     extra: { none: "None", antenna: "Antenna", leaf: "Leaf", ears: "Ears", horns: "Horns" },
@@ -597,7 +597,7 @@ Item {
     rows.push([{ kind: "pet.name", index: 0 }, { kind: "pet.random", index: 0 }])
     rows.push(root.cells("pet.tab", 5))
     if (root.tab === 0) {
-      rows.push(root.cells("pet.body", 5))
+      rows = rows.concat(root.chunks("pet.body", root.optionsOf("body").length, 5))
       rows.push(root.cells("pet.style", 2))
       rows.push(root.cells("pet.barSize", 3))
       rows.push(root.cells("pet.panelSize", 3))
@@ -721,11 +721,13 @@ Item {
   readonly property real swatchSize: Style.space(28)
   readonly property real swatchGap: Math.max(Style.space(4), Math.floor((root.width - 8 * root.swatchSize) / 7))
   readonly property int swatchRows: Math.ceil((root.swatches.length + 1) / 8)
+  // Body chips wrap five to a row, like the other traits.
+  readonly property int bodyRows: Math.ceil(root.optionsOf("body").length / 5)
 
   // Every page but Saved (and Color with the picker open) fits this height,
   // so switching tabs never moves the footer.
   readonly property real fixedPageHeight: {
-    var shape = root.headH + root.headGap + root.chip5 + root.sectionGap + root.headH + root.headGap + root.buttonH
+    var shape = root.headH + root.headGap + root.bodyRows * root.chip5 + (root.bodyRows - 1) * root.gap + root.sectionGap + root.headH + root.headGap + root.buttonH
       + root.sectionGap + 2 * root.buttonH + root.headGap
     var face = 2 * (root.headH + root.headGap + root.chip5 + root.sectionGap) + root.rowH + root.sectionGap
       + root.headH + root.headGap + root.buttonH + root.headGap + root.buttonH
@@ -1429,7 +1431,9 @@ Item {
       trying: section.trying
       value: section.trying ? "→ " + root.optionName(section.key, root.tryOn.val) : root.optionName(section.key, root.value(section.key))
     }
-    Row {
+    // Wraps when a trait has more options than fit in a row (body: 5 + 4).
+    Flow {
+      width: parent.width
       spacing: section.chipGap
       Repeater {
         model: root.optionsOf(section.key)

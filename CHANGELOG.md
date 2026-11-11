@@ -4,6 +4,11 @@
 
 ### Pet Studio
 
+- Four new bodies: **Cloud** (puffs that swell in turn), **Egg**, **Mochi** (a soft dome
+  that jiggles) and **Bean** (a kidney bean resting on its ends). Each one squashes and
+  breathes, comes in solid and outline, and wears every head extra, accessory and seasonal
+  hat in the right place (smaller hats and closer ears on the egg's narrow top). The body
+  chips wrap to a second row; shuffle picks the new bodies too.
 - The pet's size in the bar and in the panel are now two settings (S / M / L each), in the
   **Shape** tab; the stage header keeps the pet and its name. Configs and backups with the
   old single `size` use it for both until one is changed.

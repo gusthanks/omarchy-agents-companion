@@ -75,8 +75,9 @@ Alertas de limite aparecem em vermelho. Clique no bichinho para fazer carinho.
 bichinho, um botão de sorteio e o nome; embaixo, cinco abas, e Desfazer / Restaurar /
 Pronto no rodapé:
 
-- **Forma**: corpo (bolha, orbe, quadradinho, gota, fantasma), estilo (sólido ou contorno)
-  e o tamanho do bichinho na barra e no painel (Pequeno / Médio / Grande, cada um)
+- **Forma**: corpo (bolha, orbe, quadradinho, gota, fantasma, nuvem, ovo, mochi, feijão),
+  estilo (sólido ou contorno) e o tamanho do bichinho na barra e no painel (Pequeno /
+  Médio / Grande, cada um)
 - **Rosto**: olhos (cápsula, pontinhos, esbugalhados, pixel, sonolentos), boca (nenhuma,
   sorriso, surpresa, gatinho, reta), bochechas coradas e a **personalidade**: Animado (todas
   as reações e pequenas manias), Calmo (reage a você, sem manias à toa) ou Quieto

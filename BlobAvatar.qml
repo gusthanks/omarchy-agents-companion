@@ -528,6 +528,50 @@ Item {
         ctx.quadraticCurveTo(x0 - w / 2, bottom - lift * 2, x0 - w, bottom)
       }
       ctx.closePath()
+    } else if (shape === "cloud") {
+      cloudPath(ctx, cx, cy, r, sx, sy, t)
+    } else if (shape === "egg") {
+      // An ellipse whose width grows downward: narrow top, round heavy base.
+      for (var e = 0; e <= 72; e++) {
+        var ea = e / 72 * Math.PI * 2
+        var ec = Math.cos(ea), es = Math.sin(ea)
+        var ex = cx + r * 0.84 * sx * ec * (1 + 0.17 * es)
+        var ey = cy + r * sy * (-0.04 + 0.98 * es)
+        if (e === 0) ctx.moveTo(ex, ey); else ctx.lineTo(ex, ey)
+      }
+      ctx.closePath()
+    } else if (shape === "mochi") {
+      // A soft dome slumped on a flat base, spreading a little toward it like
+      // a daifuku sitting on a plate. The dome jiggles with the wobble clock.
+      var eq = cy + r * 0.22 * sy
+      var dome = r * 0.97 * sy * (1 + 0.025 * root.face.wobble * Math.sin(t * 3))
+      for (var m = 0; m <= 72; m++) {
+        var ma = m / 72 * Math.PI * 2
+        var mc = Math.cos(ma), ms = Math.sin(ma)
+        var mx, my
+        if (ms < 0) {
+          mx = cx + r * 1.04 * sx * mc
+          my = eq + dome * ms
+        } else { // superellipse quadrant: flat bottom, full lower sides
+          mx = cx + r * 1.04 * (1 + 0.05 * ms) * sx * Math.sign(mc) * Math.pow(Math.abs(mc), 0.5)
+          my = eq + r * 0.66 * sy * Math.pow(ms, 0.5)
+        }
+        if (m === 0) ctx.moveTo(mx, my); else ctx.lineTo(mx, my)
+      }
+      ctx.closePath()
+    } else if (shape === "bean") {
+      // A kidney bean lying down: an oval with a dent under the belly, so
+      // it rests on its two rounded ends.
+      for (var v = 0; v <= 90; v++) {
+        var va = v / 90 * Math.PI * 2
+        var vc = Math.cos(va), vs = Math.sin(va)
+        var uy = 0.8 * vs
+        if (vs > 0) uy -= 0.3 * vs * Math.exp(-(vc * vc) / 0.3)
+        var vx = cx + r * sx * 1.06 * vc
+        var vy = cy + r * sy * (0.07 + uy)
+        if (v === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy)
+      }
+      ctx.closePath()
     } else { // blob: wobbly organic outline
       var steps = 90
       var wa = root.face.wobble
@@ -543,8 +587,68 @@ Item {
     }
   }
 
+  // Cloud puffs as [x, y, radius] in units of r, left to right over the top.
+  // The outline runs along each puff's outer arc, from where it meets the
+  // previous puff to where it meets the next, then closes with a flat base
+  // (the end puffs share their lowest point).
+  readonly property var cloudPuffs: [[-0.7, 0.42, 0.4], [-0.43, -0.14, 0.42], [0, -0.36, 0.5], [0.43, -0.14, 0.42], [0.7, 0.42, 0.4]]
+
+  function cloudPath(ctx, cx, cy, r, sx, sy, t) {
+    var p = root.cloudPuffs
+    var n = p.length
+    var c = []
+    for (var i = 0; i < n; i++) {
+      // The top puffs swell in turn; the end puffs keep the base level.
+      var swell = i === 0 || i === n - 1 ? 0 : 0.03 * root.face.wobble * Math.sin(t * 2 + i * 1.9)
+      c.push({ x: p[i][0], y: p[i][1], r: p[i][2] * (1 + swell) })
+    }
+    // Where two neighbouring puffs cross, on the outside of the cloud.
+    function meet(a, b) {
+      var dx = b.x - a.x, dy = b.y - a.y
+      var d = Math.sqrt(dx * dx + dy * dy)
+      var along = (a.r * a.r - b.r * b.r + d * d) / (2 * d)
+      var h = Math.sqrt(Math.max(0, a.r * a.r - along * along))
+      var mx = a.x + along * dx / d, my = a.y + along * dy / d
+      var p1 = { x: mx - h * dy / d, y: my + h * dx / d }
+      var p2 = { x: mx + h * dy / d, y: my - h * dx / d }
+      var d1 = p1.x * p1.x + (p1.y - 0.2) * (p1.y - 0.2)
+      var d2 = p2.x * p2.x + (p2.y - 0.2) * (p2.y - 0.2)
+      return d1 > d2 ? p1 : p2
+    }
+    var meets = []
+    for (var j = 0; j < n - 1; j++) meets.push(meet(c[j], c[j + 1]))
+    var first = true
+    for (var k = 0; k < n; k++) {
+      var q = c[k]
+      // The end puffs start / stop at their lowest point (angle pi / 2).
+      var from = k === 0 ? Math.PI / 2 : Math.atan2(meets[k - 1].y - q.y, meets[k - 1].x - q.x)
+      var to = k === n - 1 ? Math.PI / 2 : Math.atan2(meets[k].y - q.y, meets[k].x - q.x)
+      while (to <= from) to += Math.PI * 2
+      var steps = Math.max(4, Math.ceil((to - from) / 0.2))
+      for (var s = 0; s <= steps; s++) {
+        var a = from + (to - from) * s / steps
+        var px = cx + r * sx * (q.x + q.r * Math.cos(a))
+        var py = cy + r * sy * (q.y + q.r * Math.sin(a))
+        if (first) { ctx.moveTo(px, py); first = false } else ctx.lineTo(px, py)
+      }
+    }
+    ctx.closePath()
+  }
+
+  // Where things sit on each body's head, in units of r: how high the top
+  // is, how far apart side pieces (ears, horns, bow, flower) go, and how big
+  // hats are, so a narrow egg top or a puffy cloud still wears them well.
+  readonly property var headFit: ({
+    drop: { top: 1.05, spread: 1, hat: 1 },
+    cloud: { top: 0.84, spread: 1, hat: 0.9 },
+    egg: { top: 1.0, spread: 0.72, hat: 0.82 },
+    mochi: { top: 0.75, spread: 1.04, hat: 1 },
+    bean: { top: 0.74, spread: 1, hat: 1 }
+  })
+  readonly property var head: root.headFit[root.bodyShape] || { top: 0.92, spread: 1, hat: 1 }
+
   function headTop(cy, r, sy) {
-    return cy - r * sy * (root.bodyShape === "drop" ? 1.05 : 0.92)
+    return cy - r * sy * root.head.top
   }
 
   function paintExtra(ctx, cx, cy, r, sx, sy, fill) {
@@ -582,7 +686,7 @@ Item {
     } else if (e === "ears" || e === "horns") {
       var tall = e === "ears" ? 0.5 : 0.42
       for (var s = -1; s <= 1; s += 2) {
-        var bx = cx + s * r * 0.55 * sx
+        var bx = cx + s * r * 0.55 * root.head.spread * sx
         ctx.beginPath()
         if (e === "ears") {
           ctx.moveTo(bx - s * r * 0.32, topY + r * 0.35)
@@ -800,7 +904,7 @@ Item {
       ctx.quadraticCurveTo(cx + eyes.gx * 0.5, eyes.ey - r * 0.12, cx + eyes.sp / 2 - gr + eyes.gx * 0.5, eyes.ey - r * 0.04)
       ctx.stroke()
     } else if (a === "bow") {
-      var bx = cx + r * 0.58 * sx, by = headTop(cy, r, sy) + r * 0.22
+      var bx = cx + r * 0.58 * root.head.spread * sx, by = headTop(cy, r, sy) + r * 0.22
       ctx.fillStyle = root.rgba(root.trimColor, 1)
       ctx.save()
       ctx.translate(bx, by)
@@ -818,7 +922,7 @@ Item {
       ctx.fill()
       ctx.restore()
     } else if (a === "flower") {
-      var fx = cx - r * 0.55 * sx, fy = headTop(cy, r, sy) + r * 0.25
+      var fx = cx - r * 0.55 * root.head.spread * sx, fy = headTop(cy, r, sy) + r * 0.25
       ctx.fillStyle = root.rgba(root.foreground, 1)
       for (var i = 0; i < 5; i++) {
         var ang = i / 5 * Math.PI * 2 + root.phase * 0.2
@@ -838,6 +942,14 @@ Item {
     if (h === "") return
     var top = headTop(cy, r, sy)
     var ink = root.rgba(root.trimColor, 1)
+    // Smaller hats on narrow heads, scaled from the crown so they still sit on it.
+    var fit = root.head.hat
+    if (fit !== 1) {
+      ctx.save()
+      ctx.translate(cx, top + r * 0.2)
+      ctx.scale(fit, fit)
+      ctx.translate(-cx, -top - r * 0.2)
+    }
     if (h === "hat") { // top hat
       ctx.fillStyle = ink
       roundRect(ctx, cx - r * 0.62, top + r * 0.02, r * 1.24, r * 0.16, r * 0.08)
@@ -891,6 +1003,7 @@ Item {
       ctx.ellipse(cx + r * 0.12 + r * 0.13 * 0.18 * 4 - r * 0.1, top - r * 0.7, r * 0.2, r * 0.2)
       ctx.fill()
     }
+    if (fit !== 1) ctx.restore()
   }
 
   // Small floating marks: "!" when worried, "z" when tired or asleep, and
