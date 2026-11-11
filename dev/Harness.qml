@@ -347,6 +347,8 @@ ShellRoot {
     { name: "Pip", look: { body: "blob", eyes: "capsule", color: "theme:cyan", accessory: "glasses", extra: "horns" } }
   ]
 
+  readonly property var mockRecent: ["#ff6b35", "#7c3aed", "#14b8a6", "#f43f5e", "#eab308", "#3b82f6"]
+
   // TAB (env): shape | face | extras | color | saved. A few tabs also show
   // the keyboard cursor trying an option on, or the custom color picker.
   Component {
@@ -367,6 +369,7 @@ ShellRoot {
         panelSize: shell.petConfig.panelSize || shell.petConfig.size || "m"
         petReactions: shell.petConfig.reactions || "lively"
         saved: shell.mockSaved
+        recentColors: shell.mockRecent
         themePalette: themeColors
         tab: parent.tabIndex
         Component.onCompleted: {
@@ -441,13 +444,15 @@ ShellRoot {
         petName: shell.petName + " Test"
         petReactions: "calm"
         saved: shell.mockSaved
+        recentColors: shell.mockRecent
         themePalette: themeColors
         pngDir: shell.out
         backupPath: shell.out + "/agents-pet-backup.json"
         onRestore: function(s) {
           console.log("CHECK restore keys=" + Object.keys(s).join(",") + " saved=" + (s.saved ? s.saved.length : "-")
-                      + " bar=" + s.barSize + " panel=" + s.panelSize + " reactions=" + s.reactions + " name=" + s.name)
+                      + " recent=" + JSON.stringify(s.recentColors) + " bar=" + s.barSize + " panel=" + s.panelSize + " reactions=" + s.reactions + " name=" + s.name)
         }
+        onRecentEdited: function(c) { console.log("CHECK recent " + c.join(",")); recentColors = c }
         onStatusChanged: if (status !== "") console.log("CHECK status: " + status)
       }
       FileView { id: junk; path: shell.out + "/junk.json"; printErrors: false }
@@ -475,7 +480,7 @@ ShellRoot {
           if (s === 0) fileEditor.exportPng()
           else if (s === 1) fileEditor.exportBackup()
           else if (s === 2) fileEditor.importBackup()
-          else if (s === 3) { junk.setText("{\"agentsPetBackup\": 1, \"look\": {\"body\": \"evil\", \"color\": \"red;rm\"}, \"size\": \"xxl\", \"saved\": [1, {\"name\": \"" + "x".repeat(40) + "\", \"look\": {\"eyes\": \"googly\"}}]}"); fileEditor.backupPath = shell.out + "/junk.json" }
+          else if (s === 3) { junk.setText("{\"agentsPetBackup\": 1, \"look\": {\"body\": \"evil\", \"color\": \"red;rm\"}, \"size\": \"xxl\", \"recentColors\": [\"#ABCDEF\", \"#abcdef\", \"red\", 5, \"#123456\"], \"saved\": [1, {\"name\": \"" + "x".repeat(40) + "\", \"look\": {\"eyes\": \"googly\"}}]}"); fileEditor.backupPath = shell.out + "/junk.json" }
           else if (s === 4) fileEditor.importBackup()
           else if (s === 5) { fileEditor.backupPath = shell.out + "/missing.json"; fileEditor.importBackup() }
           else if (s === 6) { fileEditor.undo() }
@@ -500,6 +505,9 @@ ShellRoot {
             // Eye / mouth size: missing -> 1, junk -> 1, off-step -> nearest step.
             console.log("CHECK scales missing=" + e.sanitize({}).eyeSize + " junk=" + e.sanitize({ eyeSize: "9x" }).eyeSize
                         + " near=" + e.sanitize({ eyeSize: 1.33 }).eyeSize + " low=" + e.sanitize({ mouthSize: 0.1 }).mouthSize)
+            // Recent colors: newest first, deduped ignoring case, theme colors skipped, capped at 8.
+            e.recentColors = ["#111111", "#222222", "#333333", "#444444", "#555555", "#666666", "#777777", "#888888"]
+            e.commit("color", "#222222".toUpperCase()); e.commit("color", "theme:blue"); e.commit("color", "#999999")
             e.setTab(1, false)
             e.syncTryOn({ kind: "pet.mouthSize", index: 4 })
             console.log("CHECK size tryOn " + JSON.stringify(e.tryOn) + " stage mouthSize=" + e.previewLook.mouthSize)
@@ -686,18 +694,21 @@ ShellRoot {
           look: shell.petLook
           petName: shell.petName
           saved: shell.mockSaved
+          recentColors: shell.mockRecent
           themePalette: themeColors
           // Stand-in for the panel: in-memory only, never written.
           onLookEdited: function(l) { look = l }
           onNameEdited: function(n) { petName = n }
           onSizeEdited: function(key, s) { previewEditor[key] = s }
           onReactionsEdited: function(r) { petReactions = r }
+          onRecentEdited: function(c) { recentColors = c }
           onPointRequested: function(kind, index) { keyTarget = { kind: kind, index: index } }
           onSaveCurrent: saved = saved.concat([{ name: petName, look: look }])
           onWear: function(i) { petName = saved[i].name; look = saved[i].look }
           onForget: function(i) { var l = saved.slice(); l.splice(i, 1); saved = l }
           onImported: function(n, l) { petName = n; look = l }
           onRestore: function(s) {
+            if (s.recentColors) recentColors = s.recentColors
             if (s.name !== undefined) petName = s.name
             if (s.look) look = s.look
             if (s.saved) saved = s.saved

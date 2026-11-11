@@ -4,6 +4,8 @@
 
 ### Pet Studio
 
+- A **Recent** row on the Color tab keeps your last 8 custom colors; click or press Enter to
+  reuse one. Undo and Reset leave it alone, and backups carry it.
 - Four new head extras: **Halo** (floats and bobs over the head), **Tuft**, **Bunny ears**
   and a **Unicorn horn**; "Ears" is now called **Cat ears**. Four new accessories:
   **Headphones**, **Crown**, **Scarf** and **Bow tie**. All of them fit every body, in

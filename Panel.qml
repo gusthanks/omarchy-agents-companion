@@ -70,8 +70,18 @@ Panel {
     petSavedJson = json
     petSaved = list
   }
-  onPetConfigChanged: syncPetSaved()
-  Component.onCompleted: syncPetSaved()
+  // Recent custom colors, cleaned by the editor and replaced only on a real change.
+  property var petRecent: []
+  property string petRecentJson: "[]"
+  function syncPetRecent() {
+    var list = petEditorItem.cleanRecent(petConfig.recentColors)
+    var json = JSON.stringify(list)
+    if (json === petRecentJson) return
+    petRecentJson = json
+    petRecent = list
+  }
+  onPetConfigChanged: { syncPetSaved(); syncPetRecent() }
+  Component.onCompleted: { syncPetSaved(); syncPetRecent() }
   // How lively the pet's reactions are: lively | calm | still.
   readonly property string petReactions: ["lively", "calm", "still"].indexOf(petConfig.reactions) >= 0 ? petConfig.reactions : "lively"
   Commons.Translations { id: petStrings; directory: Qt.resolvedUrl("i18n") }
@@ -83,7 +93,7 @@ Panel {
 
   // Merge a change into the pet config file and write it back.
   function writePet(patch) {
-    var cfg = { name: petConfig.name || "", look: petLook, barSize: petBarSize, panelSize: petPanelSize, saved: petSaved }
+    var cfg = { name: petConfig.name || "", look: petLook, barSize: petBarSize, panelSize: petPanelSize, saved: petSaved, recentColors: petRecent }
     if (petConfig.reactions !== undefined) cfg.reactions = petConfig.reactions
     for (var k in patch) cfg[k] = patch[k]
     petConfigFile.setText(JSON.stringify(cfg, null, 2) + "\n")
@@ -101,7 +111,7 @@ Panel {
   // Undo snapshots and restored backups: put back whatever keys they carry.
   function restorePet(s) {
     var patch = {}
-    var keys = ["name", "look", "saved", "barSize", "panelSize", "reactions"]
+    var keys = ["name", "look", "saved", "barSize", "panelSize", "reactions", "recentColors"]
     for (var i = 0; i < keys.length; i++) if (s && s[keys[i]] !== undefined) patch[keys[i]] = s[keys[i]]
     writePet(patch)
   }
@@ -1721,6 +1731,7 @@ Panel {
             panelSize: root.petPanelSize
             petReactions: root.petReactions
             saved: root.petSaved
+            recentColors: root.petRecent
             keyTarget: root.keyTarget
             tab: root.petTab
             onTabChanged: root.petTab = tab
@@ -1728,6 +1739,7 @@ Panel {
             onRevealRequested: function(item) { root.revealItem(item) }
             onRestore: function(s) { root.restorePet(s) }
             onReactionsEdited: function(r) { root.writePet({ reactions: r }) }
+            onRecentEdited: function(colors) { root.writePet({ recentColors: colors }) }
             themePalette: petPalette
             foreground: root.foreground
             dim: root.dim

@@ -24,6 +24,9 @@ Item {
   // lively | calm | still (see BlobAvatar.reactions)
   property string petReactions: "lively"
   property var saved: []
+  // The last custom colors picked, newest first (#rrggbb, at most 8). Kept
+  // apart from the look, so undo and reset leave them alone.
+  property var recentColors: []
   property color foreground: Commons.Color.foreground
   property color dim: Qt.darker(foreground, 1.55)
   property color accent: Commons.Color.accent
@@ -45,6 +48,7 @@ Item {
   // key: barSize | panelSize
   signal sizeEdited(string key, string size)
   signal reactionsEdited(string reactions)
+  signal recentEdited(var colors)
   signal saveCurrent()
   signal wear(int index)
   signal forget(int index)
@@ -279,7 +283,20 @@ Item {
   function fileOf(p) { return String(p).slice(String(p).lastIndexOf("/") + 1) }
 
   // ------------------------------------------------------------ edits
+  // Only valid #rrggbb, distinct ignoring case, newest first, at most 8.
+  function cleanRecent(list) {
+    var out = []
+    if (!Array.isArray(list)) return out
+    for (var i = 0; i < list.length && out.length < 8; i++) {
+      var c = String(list[i]).toLowerCase()
+      if (/^#[0-9a-f]{6}$/.test(c) && out.indexOf(c) < 0) out.push(c)
+    }
+    return out
+  }
+
   function commit(key, val) {
+    if (key === "color" && String(val).charAt(0) === "#")
+      root.recentEdited(root.cleanRecent([val].concat(root.recentColors)))
     root.touch("look")
     root.tryOn = null
     root.lookEdited(root.withTrait(key, val))
@@ -439,7 +456,8 @@ Item {
       list.push({ name: String(p.name || "").slice(0, 24), look: root.sanitize(p.look) })
     }
     return { agentsPetBackup: 1, name: root.petName, look: root.sanitize(root.look),
-             barSize: root.barSize, panelSize: root.panelSize, reactions: root.petReactions, saved: list }
+             barSize: root.barSize, panelSize: root.panelSize, reactions: root.petReactions, saved: list,
+             recentColors: root.recentColors }
   }
 
   // A backup (or a single pet code) read back, with every field checked the
@@ -464,6 +482,7 @@ Item {
       }
     }
     out.saved = list
+    out.recentColors = Array.isArray(data.recentColors) ? root.cleanRecent(data.recentColors) : root.recentColors
     return out
   }
 
@@ -649,6 +668,7 @@ Item {
       rows = rows.concat(root.chunks("pet.accessory", root.optionsOf("accessory").length, 5))
     } else if (root.tab === 3) {
       rows = rows.concat(root.chunks("pet.swatch", root.swatches.length + 1, 8))
+      rows = rows.concat(root.chunks("pet.recent", root.recentColors.length, 8))
       if (root.pickerOpen) rows.push([{ kind: "pet.hex", index: 0 }])
     } else {
       rows.push(root.cells("pet.action", 3))
@@ -673,6 +693,8 @@ Item {
       root.tryOn = { key: k, val: root.scaleSteps[target.index] }
     } else if (k === "swatch" && target.index < root.swatches.length) {
       root.tryOn = { key: "color", val: root.swatches[target.index] }
+    } else if (k === "recent" && target.index < root.recentColors.length) {
+      root.tryOn = { key: "color", val: root.recentColors[target.index] }
     }
   }
 
@@ -703,6 +725,7 @@ Item {
       if (i < root.swatches.length) root.commit("color", root.swatches[i])
       else root.pickerOpen = !root.pickerOpen
     }
+    else if (k === "recent") root.commit("color", root.recentColors[i])
     else if (k === "hex") { if (root.hexFieldItem) { root.hexFieldItem.forceActiveFocus(); root.hexFieldItem.selectAll() } }
     else if (k === "action") [root.savePet, root.copyCode, function() { pasteProc.running = true }][i]()
     else if (k === "file") [root.exportBackup, root.importBackup, root.exportPng][i]()
@@ -774,6 +797,8 @@ Item {
       + root.sectionGap + 2 * root.buttonH + root.headGap
     var extras = root.headH + root.headGap + root.chipsHeight("extra") + root.sectionGap + root.headH + root.headGap + root.chipsHeight("accessory")
     var color = root.headH + root.headGap + root.swatchRows * root.swatchSize + (root.swatchRows - 1) * Style.space(8)
+    // The Recent row (when there are colors) sits under the swatches.
+    if (root.recentColors.length > 0) color += Style.space(8) + root.headH + Style.space(8) + root.swatchSize
     return Math.ceil(Math.max(shape, extras, color))
   }
   readonly property real pageHeight: {
@@ -1270,6 +1295,25 @@ Item {
           }
         }
       }
+      SectionHead {
+        visible: root.recentColors.length > 0
+        height: visible ? implicitHeight : 0
+        title: strings.t("pet.recentColors", "RECENT")
+      }
+      Grid {
+        visible: root.recentColors.length > 0
+        height: visible ? implicitHeight : 0
+        columns: 8
+        columnSpacing: root.swatchGap
+        Repeater {
+          model: root.recentColors.length
+          Swatch {
+            required property int index
+            slot: index
+            recent: true
+          }
+        }
+      }
       Loader {
         active: root.pickerOpen
         visible: active
@@ -1519,10 +1563,14 @@ Item {
   component Swatch: Item {
     id: sw
     property int slot: 0
-    readonly property bool custom: slot >= root.swatches.length
-    readonly property string choice: custom ? "" : root.swatches[slot]
-    readonly property bool selected: custom ? String(root.value("color")).charAt(0) === "#" : root.value("color") === choice
-    readonly property bool lit: root.isKey("pet.swatch", slot)
+    // A color from the Recent row instead of the theme's own.
+    property bool recent: false
+    readonly property string kind: recent ? "pet.recent" : "pet.swatch"
+    readonly property bool custom: !recent && slot >= root.swatches.length
+    readonly property string choice: custom ? "" : (recent ? root.recentColors[slot] : root.swatches[slot])
+    readonly property bool selected: custom ? String(root.value("color")).charAt(0) === "#"
+      : (recent ? String(root.value("color")).toLowerCase() === choice : root.value("color") === choice)
+    readonly property bool lit: root.isKey(kind, slot)
     width: root.swatchSize
     height: root.swatchSize
     onLitChanged: if (lit) root.revealRequested(sw)
@@ -1569,15 +1617,15 @@ Item {
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
       onEntered: {
-        if (sw.custom) { leaveTimer.stop(); root.pointRequested("pet.swatch", sw.slot); root.tryOn = null }
-        else root.hoverOption("pet.swatch", sw.slot, "color", sw.choice)
+        if (sw.custom) { leaveTimer.stop(); root.pointRequested(sw.kind, sw.slot); root.tryOn = null }
+        else root.hoverOption(sw.kind, sw.slot, "color", sw.choice)
       }
       onExited: root.leaveOption()
-      onClicked: root.activate({ kind: "pet.swatch", index: sw.slot })
+      onClicked: root.activate({ kind: sw.kind, index: sw.slot })
     }
     PanelToolTip {
       visible: swMouse.containsMouse
-      text: sw.custom ? strings.t("pet.color.custom", "Custom…") : root.colorName(sw.choice)
+      text: sw.custom ? strings.t("pet.color.custom", "Custom…") : (sw.recent ? sw.choice : root.colorName(sw.choice))
       fontFamily: root.fontFamily
     }
   }
