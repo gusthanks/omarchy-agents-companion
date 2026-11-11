@@ -136,11 +136,11 @@ test('every source with limits stays visible, in tier order', () => {
     weekly('stale', 20, { limitsStale: true, limitsFetchedAt: NOW - 6 * H - 1 }),
     weekly('notready', 20, { ready: false }),
     provider('unknown', [limit('Spend limit', 20, D)]),
-    weekly('ontrack', 99),
+    weekly('ontrack', 86), weekly('runout', 99),
     provider('nolimits', []),
   ]);
   assert.deepEqual(r.map(x => [x.key, x.status]), [
-    ['a', 'priority'], ['ontrack', 'on_track'], ['unknown', 'unknown'], ['blocked', 'blocked'],
+    ['a', 'priority'], ['ontrack', 'on_track'], ['runout', 'running_out'], ['unknown', 'unknown'], ['blocked', 'blocked'],
     ['notready', 'unavailable'], ['stale', 'unavailable'],
   ]);
   assert.ok(r.every(x => !('score' in x)));
@@ -155,7 +155,7 @@ test('a recently cached reading still ranks', () => {
 
 test('urgent only with real unused quota before a near reset', () => {
   const rows = rank([
-    weekly('urgent', 20), weekly('ontrack', 99), weekly('blocked', 100),
+    weekly('urgent', 20), weekly('ontrack', 86), weekly('blocked', 100),
     provider('tomorrow', [limit('Weekly (7-day)', 20, D + 1000)]),
   ]);
   assert.equal(rows[0].key, 'urgent');
@@ -234,7 +234,11 @@ test('listed rows, row states and the hungry pick', () => {
     weekly('busy', 95),
   ], [], { alertUnusedPercent: 50, alertHours: 48 });
   assert.deepEqual(P.listed(r).map(x => x.key), ['soon', 'busy', 'spent']);
-  assert.deepEqual(r.map(P.state), ['urgent', 'on_track', 'unknown', 'blocked']);
+  assert.deepEqual(r.map(P.state), ['urgent', 'running_out', 'unknown', 'blocked']);
+  assert.equal(P.actionable(r), true);
+  assert.equal(P.actionable(r.slice(1)), false, 'running out, spent or unknown recommend nothing');
+  // No current numbers: the agent's own section says so, not "Use first".
+  assert.deepEqual(P.listed(rank([weekly('gone', 20, { ready: false }), weekly('a', 20)])).map(x => x.key), ['a']);
   assert.equal(P.hungry(r).key, 'soon');
   // Spare quota that resets later than the alert horizon isn't urgent.
   const later = rank([weekly('soon', 10)], [], { alertHours: 12 });
@@ -242,4 +246,44 @@ test('listed rows, row states and the hungry pick', () => {
   assert.equal(P.hungry(later), null);
   assert.equal(P.hungry([]), null);
   assert.equal(P.state(null), 'unknown');
+});
+
+test('on pace lands on the cap at the reset; running out spends it well before', () => {
+  // Six days in, a day left: 86% used lands on ~100% at the reset.
+  const onPace = rank([weekly('a', 86)])[0];
+  assert.equal(onPace.status, 'on_track');
+  assert.equal(onPace.runsOutInMs, undefined);
+  // The live Claude case: about half used with 4.5 days to go at twice the
+  // pace that would last; and Codex at 97% with 30 hours to go.
+  const claude = rank([provider('claude', [limit('Weekly (7-day)', 52, 109 * H)])])[0];
+  assert.equal(claude.status, 'running_out');
+  assert.ok(claude.runsOutInMs > 0 && claude.runsOutInMs < 109 * H, String(claude.runsOutInMs));
+  const codex = rank([provider('codex', [limit('Weekly (7-day)', 97, 30 * H)])])[0];
+  assert.equal(codex.status, 'running_out');
+  assert.ok(codex.runsOutInMs < 6 * H, String(codex.runsOutInMs));
+  // The later one to run out ranks first, and both rank below on pace.
+  assert.deepEqual(rank([weekly('soon', 99), weekly('pace', 86), weekly('later', 95)]).map(r => r.key), ['pace', 'later', 'soon']);
+});
+
+test('a model-only title (agy "Argon") is a model allowance, not the subscription', () => {
+  const agy = provider('agy', [
+    limit('Weekly (7-day)', 40, 3 * D, 'Weekly'), limit('Argon (7-day)', 100, 3 * D, 'Argon'),
+  ]);
+  const row = rank([agy])[0];
+  assert.equal(row.status, 'priority', 'a spent Argon does not block agy');
+  assert.equal(row.window, 'Weekly (7-day)');
+});
+
+test('history: a provider gaining an account hands its run to the active one', () => {
+  const lone = sample(NOW - H, 20, 'claude');
+  const two = provider('claude', [limit('Weekly (7-day)', 22, D)], { accounts: [
+    { id: 'main', active: true, limits: [limit('Weekly (7-day)', 22, D)], fetchedAt: NOW },
+    { id: 'work', limits: [limit('Weekly (7-day)', 5, D)], fetchedAt: NOW },
+  ] });
+  const r = P.append([lone], [two], NOW);
+  assert.deepEqual(r.samples.map(s => [s.source, s.percent]), [['claude@main', 20], ['claude@main', 22], ['claude@work', 5]]);
+  assert.equal(lone.source, 'claude', 'never mutated');
+  // And back: one account again takes the newest account's run.
+  const back = P.append(r.samples, [provider('claude', [limit('Weekly (7-day)', 23, D)], { limitsFetchedAt: NOW + 30 * MIN })], NOW + 30 * MIN);
+  assert.deepEqual(back.samples.filter(s => s.source === 'claude').map(s => s.percent), [20, 22, 23]);
 });

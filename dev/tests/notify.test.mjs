@@ -27,13 +27,25 @@ test('crossing the threshold fires once, normal; 100% is critical', () => {
   assert.equal(run([fetch('codex', [weekly(96)])], null).notifications.length, 0);
 });
 
-test('the same crossing never fires twice, even at 100%', () => {
+test('the same crossing fires once near the cap and once more when spent', () => {
   let s = run([fetch('codex', [weekly(97)])], null).nextState;
-  for (const pct of [98, 100, 92, 97]) {
-    const r = run([fetch('codex', [weekly(pct)])], s);
+  assert.equal(s.keys['codex::Weekly (7-day)'].level, 'normal');
+  let r = run([fetch('codex', [weekly(98)])], s);
+  assert.equal(r.notifications.length, 0, '98');
+  r = run([fetch('codex', [weekly(100)])], r.nextState);
+  assert.deepEqual(r.notifications.map(n => [n.urgency, n.percent]), [['critical', 100]], 'spent');
+  s = r.nextState;
+  for (const pct of [100, 99, 92, 100, 97]) {
+    r = run([fetch('codex', [weekly(pct)])], s);
     assert.equal(r.notifications.length, 0, String(pct));
     s = r.nextState;
   }
+  // A crossing first seen at 100% is critical once, and that's all.
+  s = run([fetch('claude', [weekly(100)])], null).nextState;
+  assert.equal(run([fetch('claude', [weekly(100)])], s).notifications.length, 0);
+  // A key kept without a level (an older state) is taken to have had both.
+  const legacy = { seen: {}, keys: { 'codex::Weekly (7-day)': { notifiedAt: clock, reset: NOW + 2 * D } } };
+  assert.equal(run([fetch('codex', [weekly(100)])], legacy).notifications.length, 0);
 });
 
 test('hysteresis: re-arms only below threshold - 7', () => {
@@ -137,7 +149,8 @@ test('readings from before the plugin started are recorded quietly, for sources 
   let r = N.decide([old], 97, null, start, start);
   assert.equal(r.notifications.length, 0, 'old news on a first run');
   assert.ok(r.nextState.keys['codex::Weekly (7-day)'], 'but it is marked');
-  assert.equal(N.decide([fetch('codex', [weekly(100)])], 97, r.nextState, clock, start).notifications.length, 0, 'the same crossing at 100%');
+  assert.equal(N.decide([fetch('codex', [weekly(99)])], 97, r.nextState, clock, start).notifications.length, 0, 'the same crossing');
+  assert.deepEqual(N.decide([fetch('codex', [weekly(100)])], 97, r.nextState, clock, start).notifications.map(n => n.urgency), ['critical'], 'but spending it is news');
   // A source the state knows fires for a reading taken while the shell was down.
   const known = { seen: { codex: old.limitsFetchedAt - H }, keys: {} };
   assert.equal(N.decide([old], 97, known, start, start).notifications.length, 1);
@@ -165,4 +178,46 @@ test('persisted state is read back only in its own shape', () => {
   assert.deepEqual(N.parseState(JSON.stringify(s)), s);
   for (const bad of ['', '{', 'null', '[]', '{"seen":{}}', '{"seen":1,"keys":{}}'])
     assert.equal(N.parseState(bad), null, bad);
+});
+
+test('a provider gaining or losing an account keeps its past', () => {
+  const single = (pct, extra) => fetch('claude', [weekly(pct)], extra);
+  const two = (pct, active = 'main') => {
+    clock += 15 * MIN;
+    return { providerId: 'claude', providerName: 'Claude', limits: [weekly(pct)], limitsFetchedAt: clock, accounts: [
+      { id: 'main', label: 'Main', active: active === 'main', limits: [weekly(pct)], fetchedAt: clock },
+      { id: 'work', label: 'Work', active: active === 'work', limits: [weekly(10)], fetchedAt: clock },
+    ] };
+  };
+  const start = NOW - D;
+  let r = N.decide([single(97)], 97, null, clock, start);
+  assert.equal(r.notifications.length, 1);
+  // An hour later a second account is added while the shell runs: the active
+  // one inherits the crossing, the new one has nothing to say.
+  clock += H;
+  r = N.decide([two(97)], 97, r.nextState, clock, start);
+  assert.deepEqual(r.notifications, [], 'no repeat for claude@main');
+  assert.ok(r.nextState.keys['claude@main::Weekly (7-day)']);
+  assert.equal(r.nextState.keys['claude::Weekly (7-day)'], undefined);
+  assert.equal(r.nextState.seen.claude, undefined);
+  // Spent on the same account still gets its critical notice.
+  r = N.decide([two(100)], 97, r.nextState, clock, start);
+  assert.deepEqual(r.notifications.map(n => [n.key, n.urgency]), [['claude@main::Weekly (7-day)', 'critical']]);
+  // Back to one account: the bare key takes the newest account's past.
+  r = N.decide([single(100)], 97, r.nextState, clock, start);
+  assert.deepEqual(r.notifications, [], 'no repeat for claude');
+  assert.equal(r.nextState.keys['claude::Weekly (7-day)'].level, 'critical');
+  // Two accounts with no active one: nothing to hand over, so nothing moves.
+  assert.equal(N.decide([two(50, 'none')], 97, r.nextState, clock, start).nextState.keys['claude::Weekly (7-day)'].level, 'critical');
+});
+
+test('a fetch stamped in the future neither fires nor holds back the real ones', () => {
+  const ahead = fetch('codex', [weekly(99)], { limitsFetchedAt: clock + 30 * D });
+  let r = run([ahead], null, clock);
+  assert.equal(r.notifications.length, 0, 'a clock running ahead');
+  assert.equal(r.nextState.seen.codex, undefined);
+  // A bad stamp already in the state doesn't block the next real fetch.
+  r = run([fetch('codex', [weekly(100)])], { seen: { codex: clock + 30 * D }, keys: {} });
+  assert.equal(r.notifications.length, 1);
+  assert.equal(r.nextState.seen.codex, clock);
 });

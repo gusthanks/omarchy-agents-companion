@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "gusthx.agents-pet",
   "name": "Agents Pet",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "author": "Gustavo Costa (gusthx)",
   "license": "MIT",
   "description": "A customizable flat pet for your Omarchy bar that follows your cursor and shares calm tips about your AI-agent usage, on top of the stock Agents panel.",
@@ -101,10 +101,10 @@
       "syncFileName": "",
       "syncDeviceId": "",
       "companionName": "Kian",
-      "showAs": "used",
+      "showAs": "Used",
       "colorCodeUsage": false,
       "showPace": true,
-      "moodWindow": "auto",
+      "moodWindow": "Auto",
       "showPriorities": true,
       "recentHours": 3,
       "alertUnusedPercent": 50,
@@ -167,10 +167,10 @@
         "type": "enum",
         "label": "Show limits as",
         "options": [
-          "used",
-          "left"
+          "Used",
+          "Left"
         ],
-        "defaultValue": "used",
+        "defaultValue": "Used",
         "description": "Read each limit meter and its percentage as the share used or the share left. Alerts still follow the share used."
       },
       {
@@ -190,21 +190,21 @@
       {
         "key": "moodWindow",
         "type": "enum",
-        "label": "Windows the pet's mood follows",
+        "label": "Limits the pet's mood watches",
         "options": [
-          "auto",
-          "session",
-          "weekly"
+          "Auto",
+          "Session",
+          "Weekly"
         ],
-        "defaultValue": "auto",
-        "description": "Which limit windows make the pet worried or out of breath. Auto watches all of them; a provider without the chosen window keeps all of its own. Tired always means every subscription is capped."
+        "defaultValue": "Auto",
+        "description": "Which limits make the pet worried or out of breath: all of them (Auto), or only the session or only the weekly ones. A provider without the chosen kind keeps all of its own. Tired always means every subscription is capped."
       },
       {
         "key": "showPriorities",
         "type": "boolean",
         "label": "Show what to use first",
         "defaultValue": true,
-        "description": "Rank your subscriptions by how much of each weekly quota would go unused at its reset, under \"Use first\" in the panel. Keeps a small local history of fresh limit readings (25 hours at most) to measure your recent pace; off, nothing is recorded."
+        "description": "Rank your subscriptions by how much of each weekly quota would go unused at its reset, under \"Use first\" in the panel while one of them would go partly unused. Keeps a small local history of fresh limit readings (25 hours at most) to measure your recent pace; off, nothing is recorded."
       },
       {
         "key": "recentHours",
@@ -248,7 +248,7 @@
         "type": "boolean",
         "label": "Desktop notifications",
         "defaultValue": true,
-        "description": "The pet sends a desktop notice when a limit reaches the threshold below (an urgent one at 100%), and when a Codex free reset is about to expire. Once per crossing; readings from before the plugin started stay quiet."
+        "description": "The pet sends a desktop notice when a limit reaches the threshold below, an urgent one when it is then used up, and one when a Codex free reset is about to expire. Once per crossing; readings from before the plugin started stay quiet."
       },
       {
         "key": "notifyThreshold",

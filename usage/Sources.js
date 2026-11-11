@@ -27,6 +27,7 @@ function sources(records) {
           account: String(acc.id),
           name: name,
           accountLabel: String(acc.label || acc.id),
+          active: acc.active === true,
           ready: true,
           limits: Array.isArray(acc.limits) ? acc.limits : [],
           stale: acc.stale === true,
@@ -42,6 +43,7 @@ function sources(records) {
       account: "",
       name: name,
       accountLabel: "",
+      active: true,
       ready: r.ready !== false,
       limits: Array.isArray(r.limits) ? r.limits : [],
       stale: r.limitsStale === true,
@@ -50,4 +52,23 @@ function sources(records) {
     })
   }
   return out
+}
+
+// The key a source's past was kept under before its provider gained or lost
+// an account, or "" when there is none to carry over. A provider's lone
+// readings were its active account's, so a second account hands them to the
+// active one; going back to one account takes the most recently seen
+// account's. lastSeen maps keys to their newest time; a key it already has
+// keeps its own past.
+function previousKey(src, lastSeen) {
+  if (!src || !lastSeen || lastSeen[src.key] !== undefined) return ""
+  if (src.account !== "") return src.active && lastSeen[src.provider] !== undefined ? src.provider : ""
+  var best = ""
+  var bestAt = -Infinity
+  for (var key in lastSeen) {
+    if (key.indexOf(src.provider + "@") !== 0 || !(Number(lastSeen[key]) > bestAt)) continue
+    best = key
+    bestAt = Number(lastSeen[key])
+  }
+  return best
 }

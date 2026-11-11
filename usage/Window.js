@@ -58,25 +58,56 @@ function scopedPart(title) {
   return match ? { model: match[1], window: match[2] } : null
 }
 
+var DAYS_RE = /(\d+)\s*-?\s*d(?:ays?)?\b/
+
+// The spans a label can state without being mistaken for a model's name: a
+// month, a week, hours or days, never minutes ("Opus 5 (1M context)").
+function statedSpanMs(text) {
+  if (text.indexOf("month") >= 0 || text.indexOf("30-day") >= 0) return MONTH_MS
+  if (isLong(text)) return WEEK_MS
+  var hours = text.match(HOURS_RE)
+  if (hours) return Number(hours[1]) * HOUR_MS
+  if (/\bdaily\b/.test(text)) return DAY_MS
+  var days = text.match(DAYS_RE)
+  return days ? Number(days[1]) * DAY_MS : 0
+}
+
+// Whether a collector's title names one of the shared window kinds, scoped
+// to a model or not. Anything else ("Argon") is a model's own allowance.
+function titledKind(windowTitle) {
+  var part = scopedPart(windowTitle)
+  var kind = part ? part.window : String(windowTitle || "")
+  return kind === "Session" || kind === "Weekly" || kind === "Monthly" ? kind : ""
+}
+
+// A limit that a single model spends: titled "<model> <kind>" ("Fable
+// Weekly"), or titled by the collector after the model alone ("Argon").
+function isModelScoped(label, windowTitle) {
+  var given = String(windowTitle || "")
+  if (given === "") return !!scopedPart(title(label))
+  return !!scopedPart(given) || titledKind(given) === ""
+}
+
 // How long a window lasts, or 0 when that can't be known. As in limitWindow,
 // the collector's title beats the label, and for a titled session only an hour
 // count is trusted: a model's name can read like a span ("Opus 5 (1M context)").
+// A title naming only a model ("Argon", label "Argon (7-day)") leaves the
+// length to what the label states.
 function durationMs(label, windowTitle) {
   var given = String(windowTitle || "")
   var text = String(label || "").toLowerCase()
   if (given !== "") {
-    var part = scopedPart(given)
-    var kind = part ? part.window : given
+    var kind = titledKind(given)
     if (kind === "Weekly") return WEEK_MS
     if (kind === "Monthly") return MONTH_MS
-    if (kind !== "Session") return 0
+    if (kind !== "Session") return statedSpanMs(text)
     var hours = text.match(HOURS_RE)
     return hours ? Number(hours[1]) * HOUR_MS : SESSION_MS
   }
   var span = spanMs(text)
   if (span > 0) return span
   if (/\bdaily\b/.test(text)) return DAY_MS
-  var days = text.match(/(\d+)\s*-?\s*d(?:ays?)?\b/)
+  var days = text.match(DAYS_RE)
   if (days) return Number(days[1]) * DAY_MS
   return text.indexOf("session") >= 0 ? SESSION_MS : 0
 }

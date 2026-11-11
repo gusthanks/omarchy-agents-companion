@@ -15,11 +15,18 @@ var PREFIXES = [
 var MAX_BODY = 400
 
 // The collectors here say "Sign-in expired" and "Waiting for auth", hence the
-// hyphen and the bare "auth" next to the reference's cues.
+// hyphen and the bare "auth" next to the reference's cues. Throttling is told
+// by its wording ("rate limited", "rate limiting"), not by "rate limits" the
+// noun: Codex's "answered without its rate limits" is no throttle. Nor is a
+// gateway holding requests "until the account has credits again", which no
+// retry fixes.
+var RATE_LIMITED = /\brate[- ]?limit(?:ed|ing)\b|\brate[- ]?limit (?:exceeded|reached|hit)\b|\b429\b|too many requests|\bbackoff\b/i
+
 function categoryOf(text) {
   for (var i = 0; i < PREFIXES.length; i++) if (PREFIXES[i].re.test(text)) return PREFIXES[i].category
   if (/not signed in|\bsign[- ]?in\b|log ?in|unauthori[sz]ed|\b401\b|\b403\b|expired token|re-?auth|\bauth\b/i.test(text)) return "credentials"
-  if (/rate.?limit|\b429\b|too many requests|backoff/i.test(text)) return "rate_limit"
+  if (/\buntil\b[^.]*\bcredits?\b|out of credits/i.test(text)) return "generic"
+  if (RATE_LIMITED.test(text)) return "rate_limit"
   if (/timed? ?out|timeout|connect|dns|network|unreachable|\b5\d\d\b/i.test(text)) return "network"
   return "generic"
 }
@@ -93,19 +100,36 @@ function retryAfterMs(text) {
   return isFinite(ms) && ms > 0 ? ms : 0
 }
 
-// The agent CLIs a notice's command may start. Anything else (a package
-// manager, a shell, an editor) is text to read, not a button to press.
-var AGENT_CLIS = ["claude", "codex", "gemini", "copilot", "cursor-agent", "grok", "kimi",
-  "opencode", "agy", "devin", "droid", "qwen", "vibe", "muse"]
+// The agent CLIs a notice's command may start, each with the only argument
+// lists that sign it in ("" is the CLI on its own, which asks to sign in when
+// it needs to). The notice text comes from the collectors, which pass a
+// provider's own error messages through, so nothing else is ever run: no
+// flag, no prompt, no other subcommand. Anything else (a package manager, a
+// shell, an editor) is text to read, not a button to press.
+var SIGN_IN = {
+  "claude": ["auth login", ""],
+  "codex": ["login", ""],
+  "gemini": [""],
+  "copilot": [""],
+  "cursor-agent": ["login", ""],
+  "grok": ["login", ""],
+  "kimi": ["login", ""],
+  "opencode": ["auth login"],
+  "agy": [""],
+  "devin": ["auth login"],
+  "droid": [""],
+  "qwen": [""],
+  "vibe": [""],
+  "muse": ["login", ""]
+}
 
-function agentClis() { return AGENT_CLIS.slice() }
+function agentClis() { return Object.keys(SIGN_IN) }
 
-// The notice's command as an argument list, or [] when it is not a known agent
-// CLI's. Each word is plain (no quotes, no expansion), so the list can go to
-// an exec as it is.
+// The notice's command as an argument list, or [] when it is not one of the
+// sign-in commands above.
 function fixArgv(command) {
   var words = String(command || "").trim().split(/\s+/)
-  if (words.length === 0 || words.length > 8 || AGENT_CLIS.indexOf(words[0]) < 0) return []
-  for (var i = 0; i < words.length; i++) if (!/^[A-Za-z0-9_.\/=@:-]+$/.test(words[i])) return []
+  var shapes = SIGN_IN.hasOwnProperty(words[0]) ? SIGN_IN[words[0]] : null
+  if (!shapes || shapes.indexOf(words.slice(1).join(" ")) < 0) return []
   return words
 }

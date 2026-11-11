@@ -124,6 +124,7 @@ Item {
   onLookChanged: canvas.requestPaint()
   onBaseColorChanged: canvas.requestPaint()
   onFeatureColorChanged: canvas.requestPaint()
+  onDroolColorChanged: canvas.requestPaint()
   onForegroundChanged: canvas.requestPaint()
   onGazeXChanged: canvas.requestPaint()
   onGazeYChanged: canvas.requestPaint()
@@ -843,7 +844,15 @@ Item {
   // and a wink (either eye shut) closes it.
   readonly property bool oneEye: root.eyeStyle === "cyclops"
   readonly property string tongueColor: "#f38ba8"
-  readonly property string droolColor: "#89dceb"
+  // Drool takes the theme's cyan; its outline in the features' color keeps
+  // it on a body of any color, a light-blue one included.
+  readonly property color droolColor: {
+    if (root.themePalette) {
+      var dep = root.themePalette.colors
+      return root.themePalette.resolve("theme:cyan", "#89dceb")
+    }
+    return "#89dceb"
+  }
 
   function disc(ctx, x, y, rad) {
     ctx.beginPath()
@@ -1189,27 +1198,30 @@ Item {
       ctx.lineWidth = r * 0.08
       ctx.arc(mx, my - r * 0.08, r * 0.14, Math.PI * 0.2, Math.PI * 0.8, false)
       ctx.stroke()
-      // A thread and a drop that slowly stretches. A tiny pet gets the drop
-      // alone, a little bigger, so it still reads.
-      var drip = root.animated ? (Math.sin(root.phase * 2) + 1) / 2 : 0.5
-      var dx = mx - r * 0.12, dy = my + r * 0.01
-      var dr = r * (root.tiny ? 0.07 : 0.05)
-      var dl = r * (0.05 + 0.04 * drip)
-      ctx.fillStyle = root.droolColor
-      ctx.strokeStyle = root.droolColor
+      // A thread and a drop that slowly stretches. At bar size the tongue
+      // alone says it: a drop beside it there reads as a smudge.
       if (!root.tiny) {
+        var drip = root.animated ? (Math.sin(root.phase * 2) + 1) / 2 : 0.5
+        var dx = mx - r * 0.12, dy = my + r * 0.01
+        var dr = r * 0.05
+        var dl = r * (0.05 + 0.04 * drip)
         ctx.beginPath()
+        ctx.strokeStyle = root.droolColor
         ctx.lineWidth = r * 0.03
         ctx.moveTo(dx, dy)
         ctx.lineTo(dx, dy + dl)
         ctx.stroke()
+        ctx.beginPath()
+        ctx.moveTo(dx, dy + dl - dr * 1.4)
+        ctx.quadraticCurveTo(dx + dr, dy + dl - dr * 0.2, dx + dr, dy + dl + dr * 0.3)
+        ctx.arc(dx, dy + dl + dr * 0.3, dr, 0, Math.PI, false)
+        ctx.quadraticCurveTo(dx - dr, dy + dl - dr * 0.2, dx, dy + dl - dr * 1.4)
+        ctx.fillStyle = root.droolColor
+        ctx.fill()
+        ctx.strokeStyle = col
+        ctx.lineWidth = r * 0.02
+        ctx.stroke()
       }
-      ctx.beginPath()
-      ctx.moveTo(dx, dy + dl - dr * 1.4)
-      ctx.quadraticCurveTo(dx + dr, dy + dl - dr * 0.2, dx + dr, dy + dl + dr * 0.3)
-      ctx.arc(dx, dy + dl + dr * 0.3, dr, 0, Math.PI, false)
-      ctx.quadraticCurveTo(dx - dr, dy + dl - dr * 0.2, dx, dy + dl - dr * 1.4)
-      ctx.fill()
     } else if (m === "o-small") {
       ctx.ellipse(mx - r * 0.045, my - r * 0.03, r * 0.09, r * 0.1 + 0.02 * r * root.breathe)
       ctx.fill()

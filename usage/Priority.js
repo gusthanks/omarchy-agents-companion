@@ -81,13 +81,26 @@ function append(samples, records, nowMs) {
   var kept = (samples || []).filter(function(s) {
     return validSample(s) && s.at >= nowMs - HISTORY_MS && s.at <= nowMs + SKEW_MS
   })
+  var list = Sources.sources(records)
+  // A provider gaining or losing an account renames its source; its recent
+  // run goes along (see Sources.previousKey).
+  var lastAt = {}
+  for (var h = 0; h < kept.length; h++)
+    if (!(lastAt[kept[h].source] >= kept[h].at)) lastAt[kept[h].source] = kept[h].at
+  for (var m = 0; m < list.length; m++) {
+    var from = Sources.previousKey(list[m], lastAt)
+    if (from === "") continue
+    var to = list[m].key
+    kept = kept.map(function(s) { return s.source === from ? Object.assign({}, s, { source: to }) : s })
+    lastAt[to] = lastAt[from]
+    delete lastAt[from]
+  }
   var newest = {}
   for (var i = 0; i < kept.length; i++) {
     var id = kept[i].source + "\n" + kept[i].window
     if (!(newest[id] >= kept[i].at)) newest[id] = kept[i].at
   }
   var added = 0
-  var list = Sources.sources(records)
   for (var j = 0; j < list.length; j++) {
     var src = list[j]
     var at = src.fetchedAt
@@ -135,7 +148,10 @@ function recentRate(samples, source, window, resetMs, at, used, recentHours) {
   return { rate: (used - first.percent) / span, hours: span }
 }
 
-var TIER = { urgent: 0, priority: 1, on_track: 2, unknown: 3, blocked: 4, unavailable: 5 }
+var TIER = { urgent: 0, priority: 1, on_track: 2, running_out: 3, unknown: 4, blocked: 5, unavailable: 6 }
+// Projected to need this much more than is left before the reset, a quota
+// runs out early rather than landing on the cap at its reset.
+var RUN_OUT_MARGIN = 1.1
 
 function tierOf(row) {
   return row.status === "priority" && row.urgent ? TIER.urgent : TIER[row.status]
@@ -143,7 +159,8 @@ function tierOf(row) {
 
 // Ranks every source with limits. status: "priority" (projected to reset with
 // at least 5% unused; urgent when that is at least alertUnusedPercent and the
-// reset is within alertHours), "on_track" (the pace uses it up), "blocked"
+// reset is within alertHours), "on_track" (the pace uses it up about when it
+// resets), "running_out" (the pace spends it well before the reset), "blocked"
 // (the weekly quota is spent), "unknown" (no window of a day or longer with a
 // known length and reset) or "unavailable" (no current data).
 // opts: { recentHours, alertUnusedPercent, alertHours }, each optional.
@@ -178,8 +195,7 @@ function rank(records, samples, nowMs, opts) {
       var limit = src.limits[k] || {}
       var percent = Number(limit.percent)
       if (!(percent >= 0)) continue
-      var windowTitle = String(limit.title || "") !== "" ? String(limit.title) : Window.title(limit.label)
-      if (Window.scopedPart(windowTitle)) continue
+      if (Window.isModelScoped(limit.label, limit.title)) continue
       shared.push({
         label: String(limit.label || ""),
         span: Window.durationMs(limit.label, limit.title),
@@ -240,10 +256,19 @@ function rank(records, samples, nowMs, opts) {
     var left = 100 - bind.used
     var unused = Math.max(0, Math.min(left, left - consumed))
     var priority = unused >= MIN_UNUSED_PERCENT
+    var runningOut = !priority && consumed > left * RUN_OUT_MARGIN
 
-    row.status = priority ? "priority" : "on_track"
+    row.status = priority ? "priority" : (runningOut ? "running_out" : "on_track")
     row.urgent = remaining <= horizon && unused >= Math.max(alertUnused, MIN_UNUSED_PERCENT)
     row.score = unused / remainingH
+    if (runningOut) {
+      // The recent pace for the next day, the cycle's after: when the
+      // projection reaches the cap. The latest of these ranks first.
+      var nearUse = blended * near
+      var capH = nearUse >= left ? left / blended : near + (left - nearUse) / cycle
+      row.runsOutInMs = Math.round(capH * HOUR_MS)
+      row.score = capH
+    }
     row.unusedPercent = Math.round(unused)
     row.remainingPercent = Math.round(left)
     row.requiredPerHour = left / remainingH
@@ -272,12 +297,20 @@ function recommendation(rows) {
 }
 
 // The rows the panel's "Use first" list shows: a source with no window of a
-// day or longer ("unknown") has no forecast to rank it by.
+// day or longer ("unknown") has no forecast to rank it by, and one without
+// current numbers ("unavailable") says so in its own section.
 function listed(rows) {
-  return (rows || []).filter(function(r) { return r.status !== "unknown" })
+  return (rows || []).filter(function(r) { return r.status !== "unknown" && r.status !== "unavailable" })
 }
 
-// "urgent" | "priority" | "on_track" | "blocked" | "unavailable" | "unknown":
+// Whether the list has anything to recommend: at least one quota that would
+// go partly unused. Without one it is only a restatement of the meters.
+function actionable(rows) {
+  return (rows || []).some(function(r) { return r.status === "priority" })
+}
+
+// "urgent" | "priority" | "on_track" | "running_out" | "blocked" |
+// "unavailable" | "unknown":
 // what a row's line says, urgency being a kind of priority.
 function state(row) {
   if (!row) return "unknown"

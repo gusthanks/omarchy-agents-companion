@@ -4,7 +4,8 @@
 .import "Sources.js" as Sources
 
 // Which notices a refresh raises. A window crossing the threshold raises one
-// per crossing (critical once it is spent), and a banked Codex reset credit
+// per crossing, and one more, critical, if it then gets spent (a crossing
+// that is already at 100% is critical at once). A banked Codex reset credit
 // raises one per expiry, 48 hours before it lapses. Only fresh fetches count:
 // a source is looked at when its fetch time moved past the last one seen and
 // it isn't a cached fallback, so a stale reading neither fires nor re-arms.
@@ -18,11 +19,13 @@
 // reading already on disk when Kian started watching (a first run, a lost
 // state file, a new account) is old news the panel shows anyway, while a
 // source the state knows keeps firing for a reading taken while the shell
-// was down, since that one is new.
+// was down, since that one is new. A provider gaining or losing an account
+// changes its source key ("claude" to "claude@work"); the old key's past
+// moves to the new one first, so the same window isn't news again.
 //
 // State: { seen: { sourceKey: fetchedAtMs },
 //          keys: { "source::label" | "source::credit::expiresMs":
-//                  { notifiedAt, reset } } }
+//                  { notifiedAt, reset, level: "normal" | "critical" } } }
 
 var DEFAULT_THRESHOLD = 97
 // A notified window re-arms only once it drops this far below the threshold,
@@ -35,6 +38,9 @@ var RESET_MOVE_TOLERANCE_MS = 90 * 60 * 1000
 var CREDIT_WARNING_MS = 48 * Window.HOUR_MS
 // Past the longest window, a crossing record is only clutter.
 var KEY_TTL_MS = 35 * Window.DAY_MS
+// A fetch stamped further ahead than this is a clock that ran ahead (before
+// an NTP sync, say): it neither decides nor holds back the real ones after it.
+var SKEW_MS = 2 * 60 * 1000
 
 function normalizeThreshold(value) {
   if (value === null || value === undefined || String(value).trim() === "") return DEFAULT_THRESHOLD
@@ -48,6 +54,19 @@ function resetMovedLater(current, recorded) {
   if (!isFinite(current)) return false
   if (recorded === null || recorded === undefined || !isFinite(recorded)) return true
   return current - Number(recorded) > RESET_MOVE_TOLERANCE_MS
+}
+
+// Moves a source's past from its old key to its new one: its last fetch and
+// every crossing and credit recorded under it.
+function carryOver(seen, keys, from, to) {
+  seen[to] = seen[from]
+  delete seen[from]
+  var names = Object.keys(keys)
+  for (var i = 0; i < names.length; i++) {
+    if (names[i].indexOf(from + "::") !== 0) continue
+    keys[to + names[i].slice(from.length)] = keys[names[i]]
+    delete keys[names[i]]
+  }
 }
 
 function decide(records, threshold, prevState, nowMs, quietBeforeMs) {
@@ -67,9 +86,16 @@ function decide(records, threshold, prevState, nowMs, quietBeforeMs) {
 
   var fired = []
   var list = Sources.sources(records)
+  for (var c = 0; c < list.length; c++) {
+    var from = Sources.previousKey(list[c], seen)
+    if (from !== "") carryOver(seen, keys, from, list[c].key)
+  }
   for (var i = 0; i < list.length; i++) {
     var src = list[i]
-    if (src.stale || !(src.fetchedAt > Number(seen[src.key] || 0))) continue
+    if (src.stale || src.fetchedAt > nowMs + SKEW_MS) continue
+    var last = Number(seen[src.key])
+    if (!(last <= nowMs + SKEW_MS)) last = 0
+    if (!(src.fetchedAt > last)) continue
     var quiet = seen[src.key] === undefined && src.fetchedAt < Number(quietBeforeMs || 0)
     seen[src.key] = src.fetchedAt
     var who = { source: src.key, provider: src.provider, name: src.name, account: src.account, accountLabel: src.accountLabel }
@@ -81,12 +107,17 @@ function decide(records, threshold, prevState, nowMs, quietBeforeMs) {
       var pct = Math.round(win.percent * 100)
       var reset = Window.timeMs(win.resetAt)
       if (pct >= limit) {
-        var armed = !keys[key] || resetMovedLater(reset, keys[key].reset)
-        if (!armed) continue
-        keys[key] = { notifiedAt: nowMs, reset: isFinite(reset) ? reset : null }
+        var level = pct >= 100 ? "critical" : "normal"
+        var known = keys[key]
+        var armed = !known || resetMovedLater(reset, known.reset)
+        // The same crossing, now spent: the critical notice, once. A key
+        // without a level is taken to have had it.
+        var spent = !armed && level === "critical" && known.level === "normal"
+        if (!armed && !spent) continue
+        keys[key] = { notifiedAt: nowMs, reset: isFinite(reset) ? reset : (known ? known.reset : null), level: level }
         if (!quiet) fired.push(Object.assign({
           kind: "limit", key: key,
-          urgency: pct >= 100 ? "critical" : "normal",
+          urgency: level,
           window: win.label, title: win.title, percent: pct, resetAt: win.resetAt
         }, who))
       } else if (pct < rearmBelow) {

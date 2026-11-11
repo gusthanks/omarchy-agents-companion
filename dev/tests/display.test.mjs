@@ -19,6 +19,8 @@ test('settings: flags, readings and mood windows, unknown values fall back', () 
   assert.equal(D.flag(undefined, true), true);
   assert.equal(D.flag('maybe', false), false);
   assert.equal(D.normalizeShowAs('left'), 'left');
+  assert.equal(D.normalizeShowAs('Left'), 'left', 'the settings form offers capitalized options');
+  assert.equal(D.normalizeShowAs('Used'), 'used');
   assert.equal(D.normalizeShowAs('Remaining'), 'left');
   assert.equal(D.normalizeShowAs(undefined), 'used');
   assert.equal(D.normalizeShowAs('sideways'), 'used');
@@ -26,6 +28,8 @@ test('settings: flags, readings and mood windows, unknown values fall back', () 
   assert.equal(D.normalizeMoodWindow('Session'), 'session');
   assert.equal(D.normalizeMoodWindow(''), 'auto');
   assert.equal(D.normalizeMoodWindow('monthly'), 'auto');
+  assert.equal(D.normalizeMoodWindow('Weekly'), 'weekly');
+  assert.equal(D.normalizeMoodWindow('Auto'), 'auto');
 });
 
 test('the shown share is used or left, clamped', () => {
@@ -49,6 +53,10 @@ test('pace glyphs follow the ratio pace, and say nothing early or unknown', () =
   assert.equal(D.paceGlyph(P.calc(0.3, NOW + span * 0.98, span, NOW)), '', 'early');
   assert.equal(D.paceGlyph(P.calc(0.3, '', span, NOW)), '', 'no reset');
   assert.equal(D.paceGlyph(null), '');
+  // Read as the share left, the arrow follows that number: a fast pace drains it.
+  assert.equal(D.paceGlyph(P.calc(0.7, NOW + span / 2, span, NOW), false, 'left'), '↓');
+  assert.equal(D.paceGlyph(P.calc(0.3, NOW + span / 2, span, NOW), false, 'left'), '↑');
+  assert.equal(D.paceGlyph(P.calc(0.52, NOW + span / 2, span, NOW), false, 'left'), '→');
 });
 
 test('window kinds, scoped windows on their own clock', () => {
@@ -72,6 +80,11 @@ test('mood windows pick the kind, or keep everything when a provider lacks it', 
   assert.equal(D.fullest(all), weekly);
   assert.equal(D.fullest(D.moodWindows(all, 'session')), session);
   assert.equal(D.fullest([]), null);
+  // agy titles a model's own week after the model alone ("Argon (7-day)").
+  const argon = W.limitWindow('Argon (7-day)', 1, iso(NOW + DAY), 'Argon', NOW);
+  assert.equal(D.windowKind(argon), 'weekly');
+  assert.deepEqual(D.moodWindows([session, argon], 'weekly'), [argon]);
+  assert.equal(D.windowKind(win('Spend limit', 0.5, 0.5, 0)), '');
 });
 
 test('panting needs a clear lead, enough used, and room before the cap', () => {

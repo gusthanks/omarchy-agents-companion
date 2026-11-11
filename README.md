@@ -10,7 +10,9 @@ reshape it however you like.
 <p align="center"><img src="docs/demo.gif" width="420" alt="The pet following the cursor, getting pats, a party, getting startled and dizzy, dozing off, then trying on other looks"></p>
 
 > Built on top of Omarchy's stock **Agents** panel (MIT). Everything the stock panel does
-> (limits, pace, balances, multi-account) is still here. The pet sits on top.
+> (limits, pace, balances, multi-account) is still here. The pet sits on top. The pacing,
+> "Use first", notifications and notice parsing are ported from
+> [ai-usagebar](https://github.com/akitaonrails/ai-usagebar) (MIT).
 
 ## What you get
 
@@ -34,27 +36,33 @@ reshape it however you like.
   limit bars still turn red as usual.
 - **Clearer notices**: an agent that cannot be read shows an icon for the kind of trouble and
   a readable message ("Rate limited — trying again in 4m" when the wait is known). When the
-  notice names a sign-in command of an installed agent CLI (`cursor-agent login`), a **Fix**
-  button (reachable by keyboard) runs it in a floating terminal and refreshes the limits when
-  it closes.
+  notice names the sign-in command of an installed agent CLI (`cursor-agent login`,
+  `claude auth login`, `kimi login`...), a **Fix** button (reachable by keyboard) runs it in
+  a floating terminal and refreshes the limits when it closes. Only those sign-in commands
+  are ever offered: never another subcommand, flag or prompt, whatever the notice says.
 - **Desktop notifications**: when a limit reaches 97% (`notifyThreshold`), Kian sends a
-  calm notice with his own face as the icon ("Claude Weekly is at 97%. It resets in 1d
-  4h."), an urgent one if it is already spent, and a heads-up when a Codex free reset
-  expires within 48 hours. Once per crossing: a limit re-arms only after dropping 7 points
-  below the threshold or starting a new window, and a restart never repeats one. Readings
-  already on disk when the plugin starts stay quiet. In the bar, Kian jumps with a "!" as
-  one goes out, or lets out his "oof" at a cap.
-- **Use first**: with more than one subscription, a short list above the agents says which
-  one to reach for before its weekly quota resets with room left over ("~60% of the weekly
-  would go unused, resets in 20h"), then the ones on pace, spent or without current numbers.
-  Hover a line for the numbers behind its place; Enter or a click goes to its limits.
+  calm notice with his own face as the icon ("Claude: Weekly at 97%. Almost at the cap. It
+  resets in 1d 4h, so another agent might be a good switch for now."), an urgent one when
+  that limit is then spent, and a heads-up when a Codex free reset expires within 48 hours.
+  Once per crossing: a limit re-arms only after dropping 7 points below the threshold or
+  starting a new window, and neither a restart nor adding a second account repeats one.
+  Readings already on disk when the plugin starts stay quiet. In the bar, Kian jumps with
+  a "!" as one goes out, or lets out his "oof" at a cap.
+- **Use first**: when one of your subscriptions would reset with room left over, a short
+  list above the agents says which one to reach for first ("~60% of the weekly would go
+  unused, resets in 20h"), then the others: on pace (lands near the cap at the reset),
+  running out (at this pace it runs out in 2d 7h, before the reset), or spent. Hover a line
+  for the numbers behind its place; Enter or a click goes to its limits. With nothing to
+  use first, the section stays out of the way.
 - **Pace on every limit**: a small accent tick where usage would be at an even pace, an
-  arrow beside the percentage (↑ ahead, → on track, ↓ under), and on hover where that pace
+  arrow beside the percentage (↑ ahead, → on track, ↓ under; read as the share left, the
+  arrow follows that number, so a fast pace points down), and on hover where that pace
   leads ("hits the limit in 1d 9h", "~92% left at reset").
 - **Seasonal hats**: a Santa hat on Dec 24–25 and a party hat on Dec 31 / Jan 1.
 - **One calm tip line** under the pet's name: live insights first (a limit near or at its
   cap with its reset time, a limit burning too fast and when it would run out, a quota
-  about to go to waste ("Codex still has ~60% this week and resets in 20h"), a quieter
+  about to go to waste ("Codex would leave ~55% of its weekly quota unused by the reset in
+  20h"), a quieter
   subscription to switch to, tokens today and per session, a late-night nudge), then a pool of general tips for working with agents.
 - **Pet Studio**: shape, face, extras, color, personality and saved pets, with backup and
   PNG export (see [Use](#use)).
@@ -150,15 +158,15 @@ celebrate, yawn, wake, startle, curious, dizzy, wink, sneeze, thinking, oof, ale
 | Gear button in the panel | Pet look, name, size, personality and saved pets (`~/.config/omarchy/agents-pet.json`) |
 | Widget settings / `shell.json` → `companionName` | Fallback name when the settings haven't set one |
 | Widget settings / `shell.json` → `refreshIntervalSec`, `sync*` | Same as the stock Agents panel |
-| Widget settings / `shell.json` → `showAs` | `used` (default) or `left`: what the limit meters and percentages read. Alerts still follow the share used |
+| Widget settings / `shell.json` → `showAs` | `Used` (default) or `Left`, in any case: what the limit meters and percentages read. Alerts still follow the share used |
 | Widget settings / `shell.json` → `colorCodeUsage` | `true` colors the meters green → yellow → orange → red from the theme as usage climbs (default `false`) |
 | Widget settings / `shell.json` → `showPace` | `false` hides the pace tick, arrow and projection (default `true`) |
-| Widget settings / `shell.json` → `showPriorities` | `false` hides "Use first" and stops keeping the history it measures your recent pace from (default `true`) |
+| Widget settings / `shell.json` → `showPriorities` | `false` hides "Use first" and stops keeping the history it measures your recent pace from (default `true`). It shows while a subscription would go partly unused |
 | Widget settings / `shell.json` → `recentHours` | Hours of recent use the forecast weighs against the cycle's average, 1–24 (default `3`) |
 | Widget settings / `shell.json` → `alertUnusedPercent`, `alertHours` | A quota is urgent when at least this share would go unused (default `50`) and it resets within these hours (default `24`) |
 | Widget settings / `shell.json` → `priorityMood` | `false` keeps the pet from getting hungry over an urgent quota (default `true`) |
-| Widget settings / `shell.json` → `notifications`, `notifyThreshold` | `false` turns the desktop notifications off (default `true`); the share used, 50–100, at which a limit notifies (default `97`) |
-| Widget settings / `shell.json` → `moodWindow` | `auto` (default), `session` or `weekly`: the windows that make the pet worried or out of breath. A provider without that window keeps all of its own; tired always means every subscription is capped |
+| Widget settings / `shell.json` → `notifications`, `notifyThreshold` | `false` turns the desktop notifications off (default `true`); the share used, 50–100, at which a limit notifies (default `97`), with one more, urgent, when it is spent |
+| Widget settings / `shell.json` → `moodWindow` | `Auto` (default), `Session` or `Weekly`, in any case: the limits that make the pet worried or out of breath. A provider without that kind keeps all of its own; tired always means every subscription is capped |
 
 ## Privacy
 

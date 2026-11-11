@@ -4,7 +4,8 @@ import Quickshell
 import Quickshell.Io
 import "usage/Notify.js" as Notify
 
-// Desktop notices: a limit crossing the threshold (critical once it is spent)
+// Desktop notices: a limit crossing the threshold (and once more, critical,
+// when it is spent)
 // and a Codex reset credit about to lapse, as usage/Notify.js decides them.
 // Only fresh fetches count (decide() looks at each source's fetch time), so
 // re-reading the same records is harmless.
@@ -51,7 +52,8 @@ Item {
 
   // ---------------------------------------------------------------- decide
 
-  property var state: null
+  // The dedupe state (not Item.state, the states machinery).
+  property var notifyState: null
   property string stateJson: ""
   property bool loaded: false
   property bool dirMade: false
@@ -74,11 +76,11 @@ Item {
   function evaluate() {
     if (!enabled || !loaded || !records || records.length === 0) return
     if (saving) { again = true; return }
-    var r = Notify.decide(records, threshold, state, Date.now(), startedAt)
+    var r = Notify.decide(records, threshold, notifyState, Date.now(), startedAt)
     var json = JSON.stringify(r.nextState)
     if (json === stateJson) return
-    prevState = state
-    state = r.nextState
+    prevState = notifyState
+    notifyState = r.nextState
     pending = r.notifications
     writingJson = json
     saving = true
@@ -95,7 +97,7 @@ Item {
       if (list.length > 0) root.fired(list)
     } else {
       // Not on disk, so not shown: the next fresh fetch decides again.
-      state = prevState
+      notifyState = prevState
     }
     if (again) { again = false; settle.restart() }
   }
@@ -118,8 +120,8 @@ Item {
     printErrors: false
     onLoaded: {
       if (root.loaded) return
-      root.state = Notify.parseState(text())
-      root.stateJson = root.state ? JSON.stringify(root.state) : ""
+      root.notifyState = Notify.parseState(text())
+      root.stateJson = root.notifyState ? JSON.stringify(root.notifyState) : ""
       root.dirMade = true
       root.loaded = true
       settle.restart()

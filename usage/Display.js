@@ -47,12 +47,15 @@ function level(percent) {
 }
 
 // The arrow beside a meter, from the ratio pace and its tolerance band, as
-// ai-usagebar's tooltip does. Nothing while the pace can't be told yet. "On
-// track" points the way the meter fills, so it turns around right-to-left.
-function paceGlyph(pace, mirrored) {
+// ai-usagebar's tooltip does. Nothing while the pace can't be told yet. The
+// arrow follows the number beside it: read as the share left, a fast pace
+// drains it, so ahead points down. "On track" points the way the meter
+// moves, so it turns around right-to-left.
+function paceGlyph(pace, mirrored, showAs) {
   if (!pace || !pace.known || pace.early) return ""
-  if (pace.ratioPace === "ahead") return "↑"
-  if (pace.ratioPace === "under") return "↓"
+  var left = showAs === "left"
+  if (pace.ratioPace === "ahead") return left ? "↓" : "↑"
+  if (pace.ratioPace === "under") return left ? "↑" : "↓"
   return mirrored ? "←" : "→"
 }
 
@@ -67,13 +70,23 @@ function kindOf(title) {
   return ""
 }
 
+// The same for a window, whose title may name only a model ("Argon"): then
+// its length tells, a week (give or take a day) being weekly.
+function windowKind(w) {
+  var kind = kindOf(w ? w.title : "")
+  if (kind !== "" || !w || !(w.spanMs > 0)) return kind
+  if (Math.abs(w.spanMs - Window.WEEK_MS) <= Window.DAY_MS) return "weekly"
+  if (w.spanMs >= 28 * Window.DAY_MS) return "monthly"
+  return w.spanMs < Window.DAY_MS ? "session" : ""
+}
+
 // The windows the mood reads for one provider: every one in auto, else the
 // chosen kind. A provider without that kind (a monthly-only plan) keeps all
 // of its windows rather than dropping out of the mood.
 function moodWindows(windows, moodWindow) {
   var list = windows || []
   if (moodWindow !== "session" && moodWindow !== "weekly") return list
-  var picked = list.filter(function(w) { return kindOf(w.title) === moodWindow })
+  var picked = list.filter(function(w) { return windowKind(w) === moodWindow })
   return picked.length > 0 ? picked : list
 }
 

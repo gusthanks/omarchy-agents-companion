@@ -81,3 +81,23 @@ test('elapsed fraction, with clock skew and unknowns', () => {
   assert.equal(W.elapsedFraction(NaN, 5 * H, NOW), -1);
   assert.equal(W.elapsedFraction(NOW + H, 0, NOW), -1);
 });
+
+test('a title naming only a model takes its length from the label (agy)', () => {
+  assert.equal(W.durationMs('Argon (7-day)', 'Argon'), 7 * D);
+  assert.equal(W.durationMs('Argon (5-hour)', 'Argon'), 5 * H);
+  assert.equal(W.durationMs('Argon (2 days)', 'Argon'), 2 * D);
+  assert.equal(W.durationMs('Argon', 'Argon'), 0);
+  assert.equal(W.durationMs('Opus 5 (1M context)', 'Opus 5'), 0, 'never minutes');
+  assert.equal(W.limitWindow('Argon (7-day)', 1, iso(NOW + D), 'Argon', NOW).spanMs, 7 * D);
+  assert.equal(W.durationMs('Claude/GPT Weekly', 'Claude/GPT Weekly'), 7 * D);
+  assert.equal(W.durationMs('Weekly (7-day)', 'Weekly'), 7 * D);
+});
+
+test('model-scoped limits: "<model> <kind>" or a title that names no kind', () => {
+  for (const [label, title, scoped] of [
+    ['Argon (7-day)', 'Argon', true], ['Claude/GPT Weekly', 'Claude/GPT Weekly', true],
+    ['Weekly (7-day)', 'Weekly', false],
+    ['Session (5-hour)', 'Session', false], ['Weekly (7-day)', undefined, false],
+    ['Spend limit', undefined, false],
+  ]) assert.equal(W.isModelScoped(label, title), scoped, `${label} / ${title}`);
+});

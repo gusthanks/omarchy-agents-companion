@@ -852,14 +852,25 @@ Panel {
 
   // What runs inside the terminal: the logo, the command, then the same
   // Done / Failed prompt as Omarchy's own (130 is Ctrl-C, which just leaves).
-  // However the terminal goes away, the trap tells the panel it is over.
-  readonly property string fixTerminalScript: "fifo=$1; shift; trap '[ -p \"$fifo\" ] && echo > \"$fifo\"' EXIT HUP; " +
+  // However the terminal goes away, the trap tells the panel it is over,
+  // once: it clears itself first (a closed window fires HUP, then EXIT), and
+  // gives up after a few seconds if nobody reads the fifo any more. dd's
+  // nocreat keeps a fifo the panel already removed from coming back as a file.
+  readonly property string fixTerminalScript: "fifo=$1; shift; " +
+    "over() { trap - EXIT HUP; timeout 5 dd of=\"$fifo\" conv=nocreat,notrunc status=none <<<\"\" 2>/dev/null; }; " +
+    "trap over EXIT; trap 'over; exit 129' HUP; " +
     "omarchy-show-logo; \"$@\"; code=$?; if (( code != 130 )); then omarchy-show-done $code; fi"
+
+  // A Fix in progress, per account where there are several.
+  function fixKey(item, owner) {
+    if (!owner) return ""
+    return String(owner.providerId) + (item && item !== owner && item.id !== undefined ? "@" + String(item.id) : "")
+  }
 
   function runFix(item, owner) {
     var argv = fixFor(item)
     if (argv.length === 0 || fixProcess.running) return
-    fixingId = String(owner.providerId)
+    fixingId = fixKey(item, owner)
     // Like omarchy-launch-floating-terminal-with-presentation, but the command
     // arrives as "$@" instead of being spliced into the script. The terminal
     // may hand off to a running instance, so its closing is told by the fifo.
@@ -867,7 +878,9 @@ Panel {
       'inner=$1; shift',
       'fifo=$(mktemp -u "${XDG_RUNTIME_DIR:-/tmp}/agents-pet-fix.XXXXXX") && mkfifo -m 600 "$fifo" || exit 1',
       'source omarchy-restart-gum',
-      'setsid uwsm-app -- xdg-terminal-exec --app-id=org.omarchy.terminal --title=Omarchy -e bash -c "$inner" bash "$fifo" "$@" >/dev/null 2>&1 &',
+      // A terminal that fails to start would leave the read waiting, so a
+      // failed launch says it's over too (twice is harmless).
+      '{ setsid uwsm-app -- xdg-terminal-exec --app-id=org.omarchy.terminal --title=Omarchy -e bash -c "$inner" bash "$fifo" "$@" >/dev/null 2>&1 || timeout 5 dd of="$fifo" conv=nocreat,notrunc status=none <<<""; } 2>/dev/null &',
       'read -r -t 1800 <>"$fifo"; rm -f "$fifo"'
     ].join("\n"), "bash", fixTerminalScript].concat(argv)
     fixProcess.running = true
@@ -988,13 +1001,14 @@ Panel {
   //
   // The ranking lives in usage/Priority.js, measured against the readings
   // UsageHistory keeps; the panel lists it under "Use first" once there is
-  // more than one subscription to choose between.
+  // more than one subscription to choose between and one of them would go
+  // partly unused, the one thing the list adds to the meters.
 
   readonly property var priorityRows: showPriorities
     ? UsagePriority.rank(providers, usageHistory.samples, root.nowMs, priorityOptions)
     : []
   readonly property var priorityList: UsagePriority.listed(priorityRows)
-  readonly property bool prioritiesShown: priorityList.length > 1
+  readonly property bool prioritiesShown: priorityList.length > 1 && UsagePriority.actionable(priorityList)
   readonly property var hungryRow: UsagePriority.hungry(priorityRows)
 
   // An account of a provider that has several goes by both names.
@@ -1019,6 +1033,7 @@ Panel {
       return petStrings.t(weekly ? "priority.unusedWeekly" : "priority.unused")
         .arg(Commons.I18n.formatNumber(row.unusedPercent)).arg(priorityResetText(row))
     if (state === "on_track") return petStrings.t("priority.onTrack").arg(priorityResetText(row))
+    if (state === "running_out") return petStrings.t("priority.runningOut").arg(root.formatDuration(row.runsOutInMs))
     if (state === "blocked")
       return petStrings.t(weekly ? "priority.blockedWeekly" : "priority.blocked").arg(priorityResetText(row))
     return petStrings.t("priority.unavailable")
@@ -1037,8 +1052,8 @@ Panel {
         .arg(windowDisplayTitle(UsageWindow.title(row.window)))
         .arg(Commons.I18n.formatNumber(state === "blocked" ? 100 : 100 - row.remainingPercent))
         .arg(priorityResetText(row)))
-    if (state === "urgent" || state === "priority" || state === "on_track") {
-      if (state !== "on_track")
+    if (state === "urgent" || state === "priority" || state === "on_track" || state === "running_out") {
+      if (state === "urgent" || state === "priority")
         lines.push(petStrings.t("priority.projectedUnused").arg(Commons.I18n.formatNumber(row.unusedPercent)))
       lines.push(petStrings.t("priority.pace").arg(priorityRate(row.pacePerHour)).arg(priorityRate(row.requiredPerHour)))
       lines.push(row.recentPerHour !== null
@@ -1297,14 +1312,14 @@ Panel {
     if (worst && worst.percent >= 1) {
       list.push({ key: "limit", badge: t.t("tip.badge.limit"), icon: "⚠️", alert: true,
         phrase: worst.resetMs > 0
-          ? t.t("tip.limitMaxed").arg(worst.provider).arg(worst.title).arg(root.formatDuration(worst.resetMs))
-          : t.t("tip.limitMaxedNoReset").arg(worst.provider).arg(worst.title) })
+          ? t.t("tip.limitMaxed").arg(worst.provider).arg(root.windowDisplayTitle(worst.title)).arg(root.formatDuration(worst.resetMs))
+          : t.t("tip.limitMaxedNoReset").arg(worst.provider).arg(root.windowDisplayTitle(worst.title)) })
     } else if (worst && worst.percent >= 0.9) {
       list.push({ key: "limit", badge: t.t("tip.badge.limit"), icon: "⚠️", alert: true,
-        phrase: t.t("tip.limitNear").arg(worst.provider).arg(worst.title).arg(pctText(worst.percent)) })
+        phrase: t.t("tip.limitNear").arg(worst.provider).arg(root.windowDisplayTitle(worst.title)).arg(pctText(worst.percent)) })
     } else if (worst && !root.hurriedLimit) {
       list.push({ key: "limit", badge: t.t("tip.badge.limits"), icon: "✓",
-        phrase: t.t("tip.limitsHealthy").arg(worst.provider).arg(worst.title).arg(pctText(worst.percent)) })
+        phrase: t.t("tip.limitsHealthy").arg(worst.provider).arg(root.windowDisplayTitle(worst.title)).arg(pctText(worst.percent)) })
     }
     // What Kian pants over, said out loud.
     var hurried = root.hurriedLimit
@@ -1313,12 +1328,13 @@ Panel {
         phrase: t.t("tip.burningFast").arg(hurried.provider).arg(root.windowDisplayTitle(hurried.window.title))
           .arg(root.formatDuration(hurried.pace.hitsInMs)) })
     }
-    // What Kian is hungry for: a quota about to go to waste.
+    // What Kian is hungry for: a quota about to go to waste, by the same
+    // projected unused share its "Use first" line gives.
     var hungry = root.hungryRow
     if (hungry) {
       list.push({ key: "hungry", badge: t.t("tip.badge.hungry"), icon: "🍽️",
         phrase: t.t(root.priorityWeekly(hungry) ? "tip.hungryWeekly" : "tip.hungry")
-          .arg(root.priorityName(hungry)).arg(Commons.I18n.formatNumber(hungry.remainingPercent))
+          .arg(root.priorityName(hungry)).arg(Commons.I18n.formatNumber(hungry.unusedPercent))
           .arg(root.priorityResetText(hungry)) })
     }
     if (worst && worst.percent >= 0.9 && calmest && calmest.provider !== worst.provider && calmest.percent < 0.5) {
@@ -1566,9 +1582,15 @@ Panel {
   }
 
   // Which of the known agent CLIs are on PATH, so a Fix button is only offered
-  // for a command that can run.
+  // for a command that can run. A login shell, as the Fix itself runs from
+  // one (mise and the like put CLIs on PATH there); it sources the profile,
+  // so opening the panel looks again only every few minutes.
+  property double clisCheckedAt: 0
+
   function findClis() {
-    if (cliProcess.running) return
+    var now = Date.now()
+    if (cliProcess.running || (clisCheckedAt > 0 && now - clisCheckedAt < 10 * 60 * 1000)) return
+    clisCheckedAt = now
     cliProcess.found = []
     cliProcess.command = ["bash", "-lc", 'for c in "$@"; do command -v "$c" >/dev/null && echo "$c"; done', "bash"]
       .concat(UsageNotice.agentClis())
@@ -2386,21 +2408,33 @@ Panel {
       width: parent.width
       spacing: Style.space(8)
 
+      // Two lines fit the collectors' sign-in hints; the header's note icon
+      // is hidden while this row shows, so a longer one is on hover here.
       Text {
         id: providerFixBody
         textFormat: Text.PlainText
         width: Math.max(0, parent.width - providerFixLink.implicitWidth - parent.spacing)
+        wrapMode: Text.WordWrap
+        maximumLineCount: 2
         elide: Text.ElideRight
         text: root.noticeIcon(section.provider) + " " + root.usageNote(section.provider)
         color: root.dim
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
+
+        HoverHandler { id: providerFixHover }
+
+        PanelToolTip {
+          visible: providerFixHover.hovered && providerFixBody.truncated
+          implicitWidth: Math.min(implicitContentWidth + leftPadding + rightPadding, Style.space(320))
+          text: root.usageNote(section.provider)
+        }
       }
 
       TextLink {
         id: providerFixLink
         picked: root.hasKey("providerFix", section.providerIndex)
-        text: root.fixingId === (section.provider ? section.provider.providerId : "") ? petStrings.t("agents.fixRunning") : petStrings.t("agents.fix")
+        text: root.fixingId !== "" && root.fixingId === root.fixKey(section.provider, section.provider) ? petStrings.t("agents.fixRunning") : petStrings.t("agents.fix")
         idleColor: Commons.Color.accent
         tooltip: petStrings.t("agents.fixTooltip").arg(providerFixRow.fixArgv.join(" "))
         onClicked: root.runFix(section.provider, section.provider)
@@ -2993,7 +3027,7 @@ Panel {
           readonly property var fixArgv: root.fixFor(head.account)
           visible: fixArgv.length > 0
           picked: head.pickedKind === "fix"
-          text: root.fixingId === (head.owner ? head.owner.providerId : "") ? petStrings.t("agents.fixRunning") : petStrings.t("agents.fix")
+          text: root.fixingId !== "" && root.fixingId === root.fixKey(head.account, head.owner) ? petStrings.t("agents.fixRunning") : petStrings.t("agents.fix")
           idleColor: Commons.Color.accent
           tooltip: petStrings.t("agents.fixTooltip").arg(fixArgv.join(" "))
           onClicked: root.runFix(head.account, head.owner)
@@ -3110,7 +3144,7 @@ Panel {
     // follow the used share.
     readonly property real shown: window ? UsageDisplay.shownFraction(window.percent, root.showAs) : 0
     readonly property var pace: UsagePacing.forWindow(window, root.nowMs)
-    readonly property string paceGlyph: root.showPace ? UsageDisplay.paceGlyph(pace, LayoutMirroring.enabled) : ""
+    readonly property string paceGlyph: root.showPace ? UsageDisplay.paceGlyph(pace, LayoutMirroring.enabled, root.showAs) : ""
     // How far into the window we are, where an even pace would have the
     // meter by now.
     readonly property real elapsed: root.showPace && pace.known && window

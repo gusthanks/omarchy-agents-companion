@@ -10,7 +10,9 @@ Você pode remodelá-lo do jeito que quiser.
 <p align="center"><img src="docs/demo.gif" width="420" alt="O bichinho seguindo o cursor, recebendo carinho, uma festa, levando um susto e ficando tonto, cochilando e depois experimentando outros visuais"></p>
 
 > Feito sobre o painel **Agents** padrão do Omarchy (MIT). Tudo o que o painel padrão faz
-> (limites, ritmo, saldos, várias contas) continua aqui. O bichinho fica por cima.
+> (limites, ritmo, saldos, várias contas) continua aqui. O bichinho fica por cima. O ritmo,
+> o "Use primeiro", as notificações e a leitura dos avisos foram portados do
+> [ai-usagebar](https://github.com/akitaonrails/ai-usagebar) (MIT).
 
 ## O que você ganha
 
@@ -35,30 +37,36 @@ Você pode remodelá-lo do jeito que quiser.
   fome. A cor dele nunca muda; as barras de limite continuam ficando vermelhas como sempre.
 - **Avisos mais claros**: um agente que não pôde ser lido mostra um ícone do tipo de problema
   e uma mensagem legível ("Limite de requisições — tentando de novo em 4m" quando o tempo
-  é conhecido). Se o aviso indica um comando de login de uma CLI de agente instalada
-  (`cursor-agent login`), o botão **Resolver** (alcançável pelo teclado) o executa num
-  terminal flutuante e atualiza os limites quando ele fecha.
+  é conhecido). Se o aviso indica o comando de login de uma CLI de agente instalada
+  (`cursor-agent login`, `claude auth login`, `kimi login`...), o botão **Resolver**
+  (alcançável pelo teclado) o executa num terminal flutuante e atualiza os limites quando
+  ele fecha. Só esses comandos de login são oferecidos: nunca outro subcomando, opção ou
+  prompt, diga o aviso o que disser.
 - **Notificações na área de trabalho**: quando um limite chega a 97% (`notifyThreshold`),
-  o Kian manda um aviso tranquilo com o próprio rosto de ícone ("Claude Semanal está em
-  97%. Volta em 1d 4h."), um urgente se ele já estourou, e um lembrete quando uma
-  redefinição gratuita do Codex expira em menos de 48 horas. Uma vez por vez que cruza: um
-  limite só volta a avisar depois de cair 7 pontos abaixo do limiar ou começar uma janela
-  nova, e reiniciar nunca repete um aviso. Leituras que já estavam no disco quando o plugin
+  o Kian manda um aviso tranquilo com o próprio rosto de ícone ("Claude: Semanal em 97%.
+  Quase no limite. Volta em 1d 4h; bom momento pra trocar de agente."), um urgente quando
+  esse limite depois estoura, e um lembrete quando uma redefinição gratuita do Codex expira
+  em menos de 48 horas. Uma vez por vez que cruza: um limite só volta a avisar depois de
+  cair 7 pontos abaixo do limiar ou começar uma janela nova, e nem reiniciar nem adicionar
+  uma segunda conta repete um aviso. Leituras que já estavam no disco quando o plugin
   abriu ficam quietas. Na barra, o Kian dá um pulinho com um "!" quando um aviso sai, ou
   solta o "ufa" quando bate no teto.
-- **Use primeiro**: com mais de uma assinatura, uma lista curta acima dos agentes diz qual
-  usar antes que a cota semanal reinicie sobrando ("~60% da semanal ficaria sem uso;
-  reinicia em 20h"), depois as que estão no ritmo, esgotadas ou sem números atualizados.
+- **Use primeiro**: quando uma das suas assinaturas reiniciaria com cota sobrando, uma
+  lista curta acima dos agentes diz qual usar primeiro ("~60% da cota semanal ficaria sem
+  uso; reinicia em 20h"), depois as outras: no ritmo (chega perto do teto bem no
+  reinício), vai acabar (nesse ritmo, acaba em 2d 7h, antes de reiniciar) ou sem cota.
   Passe o mouse numa linha para ver os números por trás da posição; Enter ou um clique leva
-  aos limites dela.
+  aos limites dela. Sem nada para usar primeiro, a seção não aparece.
 - **Ritmo em cada limite**: um tracinho na cor de destaque onde o uso estaria num ritmo
-  constante, uma seta ao lado da porcentagem (↑ acima, → no ritmo, ↓ abaixo) e, ao passar o
-  mouse, aonde esse ritmo leva ("bate no limite em 1d 9h", "sobra ~92% quando reiniciar").
+  constante, uma seta ao lado da porcentagem (↑ acima, → no ritmo, ↓ abaixo; mostrando o
+  que resta, a seta acompanha esse número, então um ritmo rápido aponta para baixo) e, ao
+  passar o mouse, aonde esse ritmo leva ("bate no limite em 1d 9h", "sobra ~92% quando
+  reiniciar").
 - **Chapéus de época**: gorro de Papai Noel em 24–25/12 e chapéu de festa em 31/12 e 1/1.
 - **Uma linha de dica tranquila** sob o nome do bichinho: primeiro as informações ao vivo
   (um limite perto ou no teto com o horário de renovação, um limite sendo gasto rápido demais
-  e quando ele acabaria, uma cota prestes a ser desperdiçada ("Codex ainda tem ~60% nesta
-  semana e reinicia em 20h"), uma assinatura mais folgada para trocar, tokens hoje e por sessão,
+  e quando ele acabaria, uma cota prestes a ser desperdiçada ("Codex deixaria ~55% da
+  cota semanal sem uso até reiniciar em 20h"), uma assinatura mais folgada para trocar, tokens hoje e por sessão,
   um lembrete tarde da noite), depois dicas gerais para trabalhar com agentes.
 - **Pet Studio**: forma, rosto, extras, cor, personalidade e bichinhos salvos, com backup
   e exportação em PNG (veja [Uso](#uso)).
@@ -160,15 +168,15 @@ celebrate, yawn, wake, startle, curious, dizzy, wink, sneeze, thinking, oof, ale
 | Engrenagem no painel | Visual, nome, tamanho, personalidade e salvos (`~/.config/omarchy/agents-pet.json`) |
 | Ajustes do widget / `shell.json` → `companionName` | Nome reserva quando os ajustes não definem um |
 | Ajustes do widget / `shell.json` → `refreshIntervalSec`, `sync*` | Igual ao painel Agents padrão |
-| Ajustes do widget / `shell.json` → `showAs` | `used` (padrão) ou `left`: se as barras e porcentagens de limite mostram o usado ou o que resta. Os alertas seguem o usado |
+| Ajustes do widget / `shell.json` → `showAs` | `Used` (padrão) ou `Left` (maiúsculas ou minúsculas): se as barras e porcentagens de limite mostram o usado ou o que resta. Os alertas seguem o usado |
 | Ajustes do widget / `shell.json` → `colorCodeUsage` | `true` pinta as barras de verde → amarelo → laranja → vermelho, com as cores do tema, conforme o uso sobe (padrão `false`) |
 | Ajustes do widget / `shell.json` → `showPace` | `false` esconde o tracinho, a seta e a projeção do ritmo (padrão `true`) |
-| Ajustes do widget / `shell.json` → `showPriorities` | `false` esconde o "Use primeiro" e para de guardar o histórico com que ele mede seu ritmo recente (padrão `true`) |
+| Ajustes do widget / `shell.json` → `showPriorities` | `false` esconde o "Use primeiro" e para de guardar o histórico com que ele mede seu ritmo recente (padrão `true`). Aparece enquanto alguma assinatura ficaria com cota sobrando |
 | Ajustes do widget / `shell.json` → `recentHours` | Horas de uso recente que a previsão pesa contra a média do ciclo, de 1 a 24 (padrão `3`) |
 | Ajustes do widget / `shell.json` → `alertUnusedPercent`, `alertHours` | Uma cota fica urgente quando pelo menos essa parte ficaria sem uso (padrão `50`) e ela reinicia dentro dessas horas (padrão `24`) |
 | Ajustes do widget / `shell.json` → `priorityMood` | `false` impede o bichinho de ficar com fome por uma cota urgente (padrão `true`) |
-| Ajustes do widget / `shell.json` → `notifications`, `notifyThreshold` | `false` desliga as notificações (padrão `true`); a parte usada, de 50 a 100, em que um limite avisa (padrão `97`) |
-| Ajustes do widget / `shell.json` → `moodWindow` | `auto` (padrão), `session` ou `weekly`: as janelas que deixam o bichinho preocupado ou ofegante. Um provedor sem essa janela continua valendo por todas as suas; cansado sempre quer dizer todas as assinaturas no teto |
+| Ajustes do widget / `shell.json` → `notifications`, `notifyThreshold` | `false` desliga as notificações (padrão `true`); a parte usada, de 50 a 100, em que um limite avisa (padrão `97`), com mais um, urgente, quando ele estoura |
+| Ajustes do widget / `shell.json` → `moodWindow` | `Auto` (padrão), `Session` ou `Weekly` (maiúsculas ou minúsculas): os limites que deixam o bichinho preocupado ou ofegante. Um provedor sem esse tipo continua valendo por todos os seus; cansado sempre quer dizer todas as assinaturas no teto |
 
 ## Privacidade
 
