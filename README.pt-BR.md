@@ -168,7 +168,8 @@ dev/run.sh editor face  # docs/editor-face.png (qualquer aba: shape face extras 
 dev/run.sh png          # testa Salvar PNG, backup / restauração e as teclas (pasta temporária)
 dev/run.sh gif          # docs/demo.gif (uns 12 s)
 dev/run.sh docs         # gera de novo todas as imagens de docs/
-dev/run.sh check        # compila todos os tipos, inclusive o Panel.qml
+dev/run.sh check        # compila todos os tipos, inclusive o Panel.qml, e as bibliotecas de usage/
+dev/run.sh test         # testes em Node das contas de uso em usage/
 omarchy plugin validate .
 git commit -am "..."    # e, quando terminar:
 dev/deploy.sh           # avança o plugin instalado até o HEAD
@@ -191,6 +192,9 @@ Veja o [CHANGELOG.md](CHANGELOG.md) (em inglês).
   este plugin se baseia): o projeto [Omarchy](https://github.com/basecamp/omarchy), MIT,
   Copyright (c) David Heinemeier Hansson.
 - Ideia do bichinho paramétrico inspirada no escultor de robôs do app móvel Hermes Agent.
+- O ritmo, a prioridade de "use ou perca", os avisos de limite e a leitura dos avisos em
+  `usage/` foram portados do [ai-usagebar](https://github.com/akitaonrails/ai-usagebar), MIT,
+  Copyright (c) 2026 AkitaOnRails.
 
 ## Licença
 

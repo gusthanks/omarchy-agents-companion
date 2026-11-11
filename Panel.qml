@@ -6,6 +6,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "PetColors.js" as PetColors
+import "usage/Window.js" as UsageWindow
 
 Panel {
   id: root
@@ -789,57 +790,10 @@ Panel {
   // and a long weekly one. Everything below normalizes them into one record so
   // the meters speak a single language.
 
-  // Claude spells its windows out ("Session (5-hour)"), Codex abbreviates
-  // them ("5h window", "30m window"). Both have to land on the same record.
-  function windowIsLong(text) {
-    return text.indexOf("week") >= 0 || text.indexOf("7-day") >= 0 || text.indexOf("seven") >= 0
-      || text.indexOf("month") >= 0 || text.indexOf("30-day") >= 0
-  }
-
-  function windowSpanMs(label) {
-    var text = String(label || "").toLowerCase()
-    if (text.indexOf("month") >= 0 || text.indexOf("30-day") >= 0) return 30 * 24 * 3600 * 1000
-    if (windowIsLong(text)) return 7 * 24 * 3600 * 1000
-    var hours = text.match(/(\d+)\s*-?\s*h(?:our)?\b/)
-    if (hours) return Number(hours[1]) * 3600 * 1000
-    var minutes = text.match(/(\d+)\s*-?\s*m(?:in(?:ute)?s?)?\b/)
-    if (minutes) return Number(minutes[1]) * 60 * 1000
-    return 0
-  }
-
-  function windowTitle(label) {
-    var text = String(label || "").toLowerCase()
-    if (text.indexOf("month") >= 0) return "Monthly"
-    if (windowIsLong(text)) return "Weekly"
-    if (text.indexOf("session") >= 0 || windowSpanMs(label) > 0) return "Session"
-    var plain = String(label || "").replace(/\s*\(.*\)\s*/, "").trim()
-    return plain === "" ? "Limit" : plain
-  }
-
-  // A collector that already knows which window a limit belongs to says so,
-  // and that beats reading it back out of the label: a model-scoped limit is
-  // titled after its model, and a name like "Opus 5 (1M context)" would parse
-  // as a one-minute window.
-  function limitWindow(label, percent, resetAt, title) {
-    var reset = new Date(String(resetAt || "")).getTime()
-    var expired = isFinite(reset) && reset <= root.nowMs
-    return {
-      title: String(title || "") !== "" ? String(title) : windowTitle(label),
-      percent: expired ? 0 : Number(percent),
-      resetAt: expired ? "" : String(resetAt || "")
-    }
-  }
-
+  // The window model (titles, lengths, expired resets) lives in
+  // usage/Window.js, shared with the usage math; the panel hands it its clock.
   function limitWindows(p) {
-    if (!p) return []
-    var out = []
-    var list = p.limits || []
-    for (var i = 0; i < list.length; i++) {
-      var entry = list[i] || {}
-      var percent = Number(entry.percent)
-      if (percent >= 0) out.push(limitWindow(entry.label, percent, entry.resetsAt, entry.title))
-    }
-    return out
+    return p ? UsageWindow.limitWindows(p.limits, root.nowMs) : []
   }
 
   // A model-scoped window ("Fable Weekly") is its own allowance, but it runs
@@ -847,8 +801,7 @@ Panel {
   // that row rather than as a row of its own. One with nothing to attach to
   // still gets its own row.
   function scopedPart(title) {
-    var match = String(title || "").match(/^(.+) (Session|Weekly|Monthly)$/)
-    return match ? { model: match[1], window: match[2] } : null
+    return UsageWindow.scopedPart(title)
   }
 
   function displayWindows(p) {
@@ -892,9 +845,7 @@ Panel {
   }
 
   function resetMsFor(w) {
-    if (!w || w.resetAt === "") return -1
-    var ms = new Date(w.resetAt).getTime()
-    return isFinite(ms) ? ms - root.nowMs : -1
+    return UsageWindow.resetInMs(w, root.nowMs)
   }
 
   function formatDuration(ms) {
@@ -1278,6 +1229,13 @@ Panel {
   Main {
     id: usage
     settings: root.settings
+  }
+
+  // Starts keeping fresh limit readings now, so the priority ranking has a
+  // recent pace to measure once it is shown.
+  UsageHistory {
+    id: usageHistory
+    records: usage.enabledProviders
   }
 
   Process {

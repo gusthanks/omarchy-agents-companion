@@ -16,7 +16,9 @@
 #   dev/run.sh gif              render docs/demo.gif
 #   dev/run.sh docs             all of the above
 #   dev/run.sh check            compile every plugin type, Panel.qml included
-#                               (declared, never instantiated); run before deploy
+#                               (declared, never instantiated), and every usage/
+#                               library; run before deploy
+#   dev/run.sh test             Node tests of the usage/ math (dev/tests)
 #
 # PET_FILE picks the pet to render (default: your own ~/.config/omarchy/agents-pet.json,
 # read only). Captures render offscreen (HEADLESS=1, the default), so nothing
@@ -87,7 +89,12 @@ case "${1:-preview}" in
     # Compile-only: types are declared inside Components that never get created,
     # so no window opens. Needs the Wayland backend (Panel uses PanelWindow).
     files=$(cd "$repo" && ls *.qml | sed 's/\.qml$//')
-    { echo 'import QtQuick'; echo 'import Quickshell'; echo 'import "pet" as Pet'; echo 'ShellRoot {'
+    # The usage/ libraries are imported too, so a broken one fails the load
+    # even before a type uses it.
+    libs=$(cd "$repo" && ls usage/*.js 2>/dev/null || true)
+    { echo 'import QtQuick'; echo 'import Quickshell'; echo 'import "pet" as Pet'
+      i=0; for f in $libs; do echo "import \"pet/$f\" as Lib$i"; i=$((i+1)); done
+      echo 'ShellRoot {'
       i=0; for f in $files; do echo "  Component { id: c$i; Pet.$f {} }"; i=$((i+1)); done
       echo '  Component.onCompleted: {'
       i=0; for f in $files; do echo "    console.warn(\"CHECK $f\", c$i.status === Component.Ready ? \"OK\" : c$i.errorString())"; i=$((i+1)); done
@@ -96,6 +103,7 @@ case "${1:-preview}" in
     if grep -q 'Failed to load configuration' "$cfg/check.log"; then grep -E 'ERROR' "$cfg/check.log" >&2; exit 1; fi
     grep -a 'CHECK ' "$cfg/check.log" | sed 's/^.*CHECK /CHECK /'
     ! grep -a 'CHECK ' "$cfg/check.log" | grep -vq ' OK$' ;;
+  test)    nice -n 19 node --test "$repo"/dev/tests/*.test.mjs ;;
   docs)    "$0" face; "$0" sheet; "$0" chips; "$0" fit; "$0" editor; "$0" gif ;;
-  *) sed -n '2,23p' "$0"; exit 1 ;;
+  *) sed -n '2,25p' "$0"; exit 1 ;;
 esac

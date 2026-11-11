@@ -33,7 +33,9 @@ dev/run.sh editor    # docs/editor-<tab>.png for shape face extras color saved, 
 dev/run.sh png       # Save PNG, backup / restore and editor key checks, in a temp folder
 dev/run.sh gif       # docs/demo.gif   (scripted demo)
 dev/run.sh docs      # all of the above
-dev/run.sh check     # compile every type, Panel.qml included (deploy runs this too)
+dev/run.sh check     # compile every type, Panel.qml included, and the usage/ libraries
+                     # (deploy runs this too)
+dev/run.sh test      # Node tests of the pure usage math in usage/ (dev/tests)
 ```
 
 QML errors from the harness are printed by `dev/run.sh`; fix them before going further.
@@ -58,6 +60,9 @@ layout). Never deploy or restart in the middle of a task.
 
 ## Other conventions
 
+- Usage math (windows, pace, priority, notifications, notices) lives in pure `.pragma
+  library` files under `usage/`, with the clock passed in; Panel.qml only presents it. Add
+  a Node test in `dev/tests/` for any change there and run `dev/run.sh test`.
 - Repo root = plugin root (the layout `omarchy plugin add <url>` expects).
 - Strings go through the plugin's own catalog in `i18n/` (`Commons.Translations`), never
   through `Commons.I18n` keys, which Omarchy may rename.

@@ -45,6 +45,18 @@
   lengths rotate; the panel below eases to the new height. Hovering still pauses the
   rotation, and the › button now fades to the next tip like the timed rotation.
 
+### Usage math
+
+- The limit-window rules (titles, lengths, expired resets) moved from the panel to
+  `usage/Window.js`; the panel shows the same thing.
+- New pure, tested libraries in `usage/`, not shown yet: pacing with a projection to the
+  reset, a use-it-or-lose-it priority across subscriptions and accounts, limit and reset
+  credit notification decisions, and notice parsing. Ported from ai-usagebar (MIT).
+- The panel keeps the last 25 hours of fresh limit readings in
+  `~/.local/state/omarchy/agents-pet/usage-history.json` (percentages and reset times
+  only), for the priority's recent pace.
+- `dev/run.sh test` runs the Node tests; `dev/run.sh check` also compiles `usage/`.
+
 ## 2.1.1 (2026-11-09)
 
 ### Panel

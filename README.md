@@ -158,7 +158,8 @@ dev/run.sh editor face  # docs/editor-face.png (any tab: shape face extras color
 dev/run.sh png          # checks Save PNG, backup / restore and the editor's keys (temp folder)
 dev/run.sh gif          # docs/demo.gif (about 12 s)
 dev/run.sh docs         # regenerate every image in docs/
-dev/run.sh check        # compile every type, Panel.qml included
+dev/run.sh check        # compile every type, Panel.qml included, and the usage/ libraries
+dev/run.sh test         # Node tests of the usage math in usage/
 omarchy plugin validate .
 git commit -am "..."    # then, when it is done:
 dev/deploy.sh           # fast-forward the installed plugin to HEAD
@@ -180,6 +181,8 @@ PetEditor.qml      pet settings: stage, tabs, try-on, undo, saved pets, backup, 
 PetChip.qml        one framed option chip in the settings
 ColorPicker.qml    saturation/value square + hue strip
 ThemePalette.qml   reads the current theme's named colors
+usage/             pure usage math (windows, pace, priority, notices), tested in dev/tests
+UsageHistory.qml   keeps 25 h of fresh limit readings in ~/.local/state/omarchy/agents-pet/
 Main.qml, Agent.qml, assets/   stock Agents plugin pieces
 i18n/              strings (stock panel strings in 50 languages, pet strings en + pt-BR)
 dev/               isolated harness (run.sh, Harness.qml), deploy.sh
@@ -196,6 +199,9 @@ See [CHANGELOG.md](CHANGELOG.md).
   plugin builds on): the [Omarchy](https://github.com/basecamp/omarchy) project, MIT,
   Copyright (c) David Heinemeier Hansson.
 - Parametric pet idea inspired by the Hermes Agent mobile app's bot sculptor.
+- Pacing, use-it-or-lose-it priority, limit notifications and notice parsing in `usage/`
+  are ported from [ai-usagebar](https://github.com/akitaonrails/ai-usagebar), MIT,
+  Copyright (c) 2026 AkitaOnRails.
 
 ## License
 
