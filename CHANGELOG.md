@@ -44,17 +44,33 @@
   one line that only opened on hover. The pet and the name stay put as tips of different
   lengths rotate; the panel below eases to the new height. Hovering still pauses the
   rotation, and the › button now fades to the next tip like the timed rotation.
+- **Pace on the limit meters**: an accent tick where usage would be at an even pace, an
+  arrow beside the percentage (↑ ahead, → on track, ↓ under, turned around right-to-left)
+  and a tooltip line with where that pace leads ("hits the limit in 1d 9h", "~92% left at
+  reset"). Rows stay aligned with or without it.
+- New widget settings: `showAs` (`used` / `left`; the alarm still follows the share used),
+  `colorCodeUsage` (meters green → yellow → orange → red from the theme), `showPace`, and
+  `moodWindow` (`auto` / `session` / `weekly`: which windows make the pet worried or out of
+  breath). Configs without them keep today's look.
+- Kian gets **out of breath** (open mouth with the tongue showing, flushed cheeks, quick
+  breaths, a sweat drop and puffs) when a limit is burning at least 15 points ahead of an
+  even pace with 20% or more used and no cap near yet; worried and tired win over it. A
+  matching tip says when that limit would run out, and takes the place of "limits look
+  healthy".
 
 ### Usage math
 
 - The limit-window rules (titles, lengths, expired resets) moved from the panel to
   `usage/Window.js`; the panel shows the same thing.
-- New pure, tested libraries in `usage/`, not shown yet: pacing with a projection to the
-  reset, a use-it-or-lose-it priority across subscriptions and accounts, limit and reset
-  credit notification decisions, and notice parsing. Ported from ai-usagebar (MIT).
+- New pure, tested libraries in `usage/`: pacing with a projection to the reset (now shown
+  on the meters), and, not shown yet, a use-it-or-lose-it priority across subscriptions and
+  accounts, limit and reset credit notification decisions, and notice parsing. Ported from
+  ai-usagebar (MIT).
 - The panel keeps the last 25 hours of fresh limit readings in
   `~/.local/state/omarchy/agents-pet/usage-history.json` (percentages and reset times
   only), for the priority's recent pace.
+- `usage/Display.js` (ported from ai-usagebar): used / left readings, color rungs, the pace
+  arrow, the mood's windows and when the pet pants.
 - `dev/run.sh test` runs the Node tests; `dev/run.sh check` also compiles `usage/`.
 
 ## 2.1.1 (2026-11-09)

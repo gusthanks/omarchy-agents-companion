@@ -11,7 +11,7 @@ import "PetClips.js" as PetClips
 //
 // look: { body, eyes, mouth, extra, accessory, cheeks, style, color,
 //         eyeSize, mouthSize }
-// mood (set by the host): "normal" | "worried" | "tired"
+// mood (set by the host): "normal" | "panting" | "worried" | "tired"
 Item {
   id: root
 
@@ -145,8 +145,9 @@ Item {
     running: root.animated && root.visible
   }
 
-  // Breathing slows down when tired or asleep, and pauses during a reaction.
-  readonly property int breathMs: root.face.breathRate < 0.8 ? 2800 : 1800
+  // Breathing slows down when tired or asleep, quickens when panting, and
+  // pauses during a reaction.
+  readonly property int breathMs: root.face.breathRate < 0.8 ? 2800 : (root.face.breathRate > 1.2 ? 650 : 1800)
   SequentialAnimation on breathe {
     running: root.animated && root.visible && !root.reacting && root.avatarState !== "happy"
     loops: Animation.Infinite
@@ -1099,6 +1100,7 @@ Item {
     if (m === "tongue") return 0.16
     if (m === "grin") return 0.1
     if (m === "o-small") return 0.08
+    if (m === "pant") return 0.16
     return 0.06
   }
 
@@ -1145,6 +1147,23 @@ Item {
       var ow = r * 0.14 * (1 + 0.3 * mo), oh = r * 0.16 * (1 + 0.8 * mo)
       ctx.ellipse(mx - ow / 2, my + r * 0.03 - oh / 2, ow, oh)
       ctx.fill()
+    } else if (m === "pant") {
+      // Out of breath: an open mouth with the tongue over its lower lip,
+      // gasping a little wider with each quick breath.
+      var pw = r * 0.25, ph = r * (0.17 + 0.03 * mo * root.breathe)
+      ctx.ellipse(mx - pw / 2, my - r * 0.07, pw, ph)
+      ctx.fill()
+      var pt = r * 0.065, py = my - r * 0.07 + ph * 0.55
+      ctx.beginPath()
+      ctx.moveTo(mx - pt, py)
+      ctx.lineTo(mx - pt, py + r * 0.05)
+      ctx.arc(mx, py + r * 0.05, pt, Math.PI, 0, true)
+      ctx.lineTo(mx + pt, py)
+      ctx.closePath()
+      ctx.fillStyle = root.tongueColor
+      ctx.fill()
+      ctx.lineWidth = r * 0.03
+      ctx.stroke()
     } else if (m === "o-small") {
       ctx.ellipse(mx - r * 0.045, my - r * 0.03, r * 0.09, r * 0.1 + 0.02 * r * root.breathe)
       ctx.fill()
@@ -1528,8 +1547,19 @@ Item {
     if (fit !== 1) ctx.restore()
   }
 
-  // Small floating marks: "!" when worried, "z" when tired or asleep, and
-  // the reactions' own ("?", "...", a sweat drop, dizzy stars).
+  function sweatDrop(ctx, x, y, r) {
+    ctx.fillStyle = root.rgba(root.foreground, 0.85)
+    ctx.beginPath()
+    ctx.moveTo(x, y - r * 0.2)
+    ctx.quadraticCurveTo(x + r * 0.13, y, x + r * 0.1, y + r * 0.06)
+    ctx.arc(x, y + r * 0.06, r * 0.1, 0, Math.PI, false)
+    ctx.quadraticCurveTo(x - r * 0.13, y, x, y - r * 0.2)
+    ctx.fill()
+  }
+
+  // Small floating marks: "!" when worried, "z" when tired or asleep, a sweat
+  // drop and puffs of breath when panting, and the reactions' own ("?",
+  // "...", a sweat drop, dizzy stars).
   function paintMarks(ctx, S, cx, cy, r) {
     var f = root.face
     var mk = f.mark
@@ -1561,14 +1591,18 @@ Item {
         ctx.fill()
       }
     } else if (mk === "sweat") {
-      var sx0 = cx - r * 0.95, sy0 = cy - r * 0.55
-      ctx.fillStyle = root.rgba(root.foreground, 0.85)
-      ctx.beginPath()
-      ctx.moveTo(sx0, sy0 - r * 0.2)
-      ctx.quadraticCurveTo(sx0 + r * 0.13, sy0, sx0 + r * 0.1, sy0 + r * 0.06)
-      ctx.arc(sx0, sy0 + r * 0.06, r * 0.1, 0, Math.PI, false)
-      ctx.quadraticCurveTo(sx0 - r * 0.13, sy0, sx0, sy0 - r * 0.2)
-      ctx.fill()
+      root.sweatDrop(ctx, cx - r * 0.95, cy - r * 0.55, r)
+    } else if (mk === "pant") {
+      root.sweatDrop(ctx, cx - r * 0.95, cy - r * 0.55, r)
+      // Two puffs of breath drifting off the side, clear of the body,
+      // growing as they fade. A still pet holds them mid-drift.
+      var drift = root.animated ? (root.phase / (Math.PI * 2) * 3) % 1 : 0.2
+      ctx.fillStyle = root.rgba(root.foreground, 1)
+      for (var q = 0; q < 2; q++) {
+        var u = (drift + q * 0.5) % 1
+        ctx.globalAlpha = (1 - u * 0.75) * 0.85 * fade
+        root.disc(ctx, cx + r * (1.14 + 0.2 * u), cy + r * (0.15 - 0.2 * u), r * (0.07 + 0.05 * u))
+      }
     } else if (mk === "stars") {
       ctx.font = "bold " + Math.round(r * 0.3) + "px sans-serif"
       for (var j = 0; j < 3; j++) {

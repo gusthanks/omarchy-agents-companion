@@ -100,7 +100,11 @@
       "syncDir": "",
       "syncFileName": "",
       "syncDeviceId": "",
-      "companionName": "Kian"
+      "companionName": "Kian",
+      "showAs": "used",
+      "colorCodeUsage": false,
+      "showPace": true,
+      "moodWindow": "auto"
     },
     "schema": [
       {
@@ -150,6 +154,43 @@
         "label": "Device id",
         "defaultValue": "",
         "description": "Optional stable device name used inside synced aggregate snapshots."
+      },
+      {
+        "key": "showAs",
+        "type": "enum",
+        "label": "Show limits as",
+        "options": [
+          "used",
+          "left"
+        ],
+        "defaultValue": "used",
+        "description": "Read each limit meter and its percentage as the share used or the share left. Alerts still follow the share used."
+      },
+      {
+        "key": "colorCodeUsage",
+        "type": "boolean",
+        "label": "Color-code limit meters",
+        "defaultValue": false,
+        "description": "Meters go green, yellow, orange and red from the theme's palette as usage climbs. Off keeps them in the bar's color, red near the cap."
+      },
+      {
+        "key": "showPace",
+        "type": "boolean",
+        "label": "Show pace on limit meters",
+        "defaultValue": true,
+        "description": "A tick where usage would be at an even pace, an arrow (ahead, on track, under) and, on hover, where that pace leads by the reset."
+      },
+      {
+        "key": "moodWindow",
+        "type": "enum",
+        "label": "Windows the pet's mood follows",
+        "options": [
+          "auto",
+          "session",
+          "weekly"
+        ],
+        "defaultValue": "auto",
+        "description": "Which limit windows make the pet worried or out of breath. Auto watches all of them; a provider without the chosen window keeps all of its own. Tired always means every subscription is capped."
       }
     ]
   },

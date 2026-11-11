@@ -25,13 +25,18 @@ reshape it however you like.
   rushes at it, tilts its head when the cursor rests nearby, winks hello, lets out an "oof"
   when a subscription hits its cap and a sigh when a limit stops being close. Now and then
   it sneezes or yawns. The bar pet only shows still poses, so it stays cheap.
-- **Moods from your limits**: worried (raised brows, a little "!") when a limit is close,
-  tired ("z") when every subscription is maxed out, and a small confetti party when one
-  comes back. Its color never changes; the limit bars still turn red as usual.
+- **Moods from your limits**: out of breath (open mouth, flushed cheeks, a sweat drop and
+  puffs) when a limit is burning well ahead of an even pace, worried (raised brows, a little
+  "!") when one is close, tired ("z") when every subscription is maxed out, and a small
+  confetti party when one comes back. Tired beats worried, worried beats out of breath. Its
+  color never changes; the limit bars still turn red as usual.
+- **Pace on every limit**: a small accent tick where usage would be at an even pace, an
+  arrow beside the percentage (↑ ahead, → on track, ↓ under), and on hover where that pace
+  leads ("hits the limit in 1d 9h", "~92% left at reset").
 - **Seasonal hats**: a Santa hat on Dec 24–25 and a party hat on Dec 31 / Jan 1.
 - **One calm tip line** under the pet's name: live insights first (a limit near or at its
-  cap with its reset time, a quieter subscription to switch to, tokens today and per session,
-  a late-night nudge), then a pool of general tips for working with agents.
+  cap with its reset time, a limit burning too fast and when it would run out, a quieter
+  subscription to switch to, tokens today and per session, a late-night nudge), then a pool of general tips for working with agents.
 - **Pet Studio**: shape, face, extras, color, personality and saved pets, with backup and
   PNG export (see [Use](#use)).
 
@@ -126,6 +131,10 @@ celebrate, yawn, wake, startle, curious, dizzy, wink, sneeze, thinking, oof, sig
 | Gear button in the panel | Pet look, name, size, personality and saved pets (`~/.config/omarchy/agents-pet.json`) |
 | Widget settings / `shell.json` → `companionName` | Fallback name when the settings haven't set one |
 | Widget settings / `shell.json` → `refreshIntervalSec`, `sync*` | Same as the stock Agents panel |
+| Widget settings / `shell.json` → `showAs` | `used` (default) or `left`: what the limit meters and percentages read. Alerts still follow the share used |
+| Widget settings / `shell.json` → `colorCodeUsage` | `true` colors the meters green → yellow → orange → red from the theme as usage climbs (default `false`) |
+| Widget settings / `shell.json` → `showPace` | `false` hides the pace tick, arrow and projection (default `true`) |
+| Widget settings / `shell.json` → `moodWindow` | `auto` (default), `session` or `weekly`: the windows that make the pet worried or out of breath. A provider without that window keeps all of its own; tired always means every subscription is capped |
 
 ## Privacy
 
@@ -199,8 +208,8 @@ See [CHANGELOG.md](CHANGELOG.md).
   plugin builds on): the [Omarchy](https://github.com/basecamp/omarchy) project, MIT,
   Copyright (c) David Heinemeier Hansson.
 - Parametric pet idea inspired by the Hermes Agent mobile app's bot sculptor.
-- Pacing, use-it-or-lose-it priority, limit notifications and notice parsing in `usage/`
-  are ported from [ai-usagebar](https://github.com/akitaonrails/ai-usagebar), MIT,
+- Pacing, use-it-or-lose-it priority, limit notifications, notice parsing and the limit
+  display options (used / left, color rungs, the mood's window) in `usage/` are ported from [ai-usagebar](https://github.com/akitaonrails/ai-usagebar), MIT,
   Copyright (c) 2026 AkitaOnRails.
 
 ## License

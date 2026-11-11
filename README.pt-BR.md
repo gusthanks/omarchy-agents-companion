@@ -26,15 +26,20 @@ Você pode remodelá-lo do jeito que quiser.
   correndo, inclina a cabeça quando o cursor para perto, pisca um olá, solta um "ufa" quando
   uma assinatura bate no teto e um suspiro quando um limite deixa de estar perto. De vez em
   quando espirra ou boceja. Na barra ele só mostra poses paradas, para ficar leve.
-- **Humores pelos limites**: preocupado (sobrancelhas levantadas, um "!") quando um limite
-  está perto, cansado ("z") quando todas as assinaturas estouraram, e uma festinha de
-  confete quando uma volta. A cor dele nunca muda; as barras de limite continuam ficando
-  vermelhas como sempre.
+- **Humores pelos limites**: ofegante (boca aberta, bochechas coradas, uma gota de suor e
+  baforadas) quando um limite está sendo gasto bem acima de um ritmo constante, preocupado
+  (sobrancelhas levantadas, um "!") quando um limite está perto, cansado ("z") quando todas
+  as assinaturas estouraram, e uma festinha de confete quando uma volta. Cansado vence
+  preocupado, que vence ofegante. A cor dele nunca muda; as barras de limite continuam
+  ficando vermelhas como sempre.
+- **Ritmo em cada limite**: um tracinho na cor de destaque onde o uso estaria num ritmo
+  constante, uma seta ao lado da porcentagem (↑ acima, → no ritmo, ↓ abaixo) e, ao passar o
+  mouse, aonde esse ritmo leva ("bate no limite em 1d 9h", "sobra ~92% quando reiniciar").
 - **Chapéus de época**: gorro de Papai Noel em 24–25/12 e chapéu de festa em 31/12 e 1/1.
 - **Uma linha de dica tranquila** sob o nome do bichinho: primeiro as informações ao vivo
-  (um limite perto ou no teto com o horário de renovação, uma assinatura mais folgada para
-  trocar, tokens hoje e por sessão, um lembrete tarde da noite), depois dicas gerais para
-  trabalhar com agentes.
+  (um limite perto ou no teto com o horário de renovação, um limite sendo gasto rápido demais
+  e quando ele acabaria, uma assinatura mais folgada para trocar, tokens hoje e por sessão,
+  um lembrete tarde da noite), depois dicas gerais para trabalhar com agentes.
 - **Pet Studio**: forma, rosto, extras, cor, personalidade e bichinhos salvos, com backup
   e exportação em PNG (veja [Uso](#uso)).
 
@@ -135,6 +140,10 @@ celebrate, yawn, wake, startle, curious, dizzy, wink, sneeze, thinking, oof, sig
 | Engrenagem no painel | Visual, nome, tamanho, personalidade e salvos (`~/.config/omarchy/agents-pet.json`) |
 | Ajustes do widget / `shell.json` → `companionName` | Nome reserva quando os ajustes não definem um |
 | Ajustes do widget / `shell.json` → `refreshIntervalSec`, `sync*` | Igual ao painel Agents padrão |
+| Ajustes do widget / `shell.json` → `showAs` | `used` (padrão) ou `left`: se as barras e porcentagens de limite mostram o usado ou o que resta. Os alertas seguem o usado |
+| Ajustes do widget / `shell.json` → `colorCodeUsage` | `true` pinta as barras de verde → amarelo → laranja → vermelho, com as cores do tema, conforme o uso sobe (padrão `false`) |
+| Ajustes do widget / `shell.json` → `showPace` | `false` esconde o tracinho, a seta e a projeção do ritmo (padrão `true`) |
+| Ajustes do widget / `shell.json` → `moodWindow` | `auto` (padrão), `session` ou `weekly`: as janelas que deixam o bichinho preocupado ou ofegante. Um provedor sem essa janela continua valendo por todas as suas; cansado sempre quer dizer todas as assinaturas no teto |
 
 ## Privacidade
 
@@ -192,7 +201,8 @@ Veja o [CHANGELOG.md](CHANGELOG.md) (em inglês).
   este plugin se baseia): o projeto [Omarchy](https://github.com/basecamp/omarchy), MIT,
   Copyright (c) David Heinemeier Hansson.
 - Ideia do bichinho paramétrico inspirada no escultor de robôs do app móvel Hermes Agent.
-- O ritmo, a prioridade de "use ou perca", os avisos de limite e a leitura dos avisos em
+- O ritmo, a prioridade de "use ou perca", os avisos de limite, a leitura dos avisos e as
+  opções de exibição dos limites (usado / restante, faixas de cor, a janela do humor) em
   `usage/` foram portados do [ai-usagebar](https://github.com/akitaonrails/ai-usagebar), MIT,
   Copyright (c) 2026 AkitaOnRails.
 

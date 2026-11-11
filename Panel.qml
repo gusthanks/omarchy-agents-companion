@@ -7,6 +7,8 @@ import qs.Commons as Commons
 import qs.Ui
 import "PetColors.js" as PetColors
 import "usage/Window.js" as UsageWindow
+import "usage/Pacing.js" as UsagePacing
+import "usage/Display.js" as UsageDisplay
 
 Panel {
   id: root
@@ -26,6 +28,14 @@ Panel {
     var value = root.settings ? root.settings[name] : undefined
     return value === undefined || value === null ? fallback : value
   }
+
+  // How the limit meters read: used or left (the alarm still follows the
+  // used share), colored by how full they are, and with the pace on them.
+  readonly property string showAs: UsageDisplay.normalizeShowAs(setting("showAs", "used"))
+  readonly property bool colorCodeUsage: UsageDisplay.flag(setting("colorCodeUsage", false), false)
+  readonly property bool showPace: UsageDisplay.flag(setting("showPace", true), true)
+  // Which windows Kian's mood watches: auto | session | weekly.
+  readonly property string moodWindow: UsageDisplay.normalizeMoodWindow(setting("moodWindow", "auto"))
 
   // Persisted pet: name + look, written by the inline editor.
   readonly property string petConfigPath: (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")) + "/omarchy/agents-pet.json"
@@ -133,8 +143,8 @@ Panel {
     writePet({ saved: list })
   }
 
-  // Mood follows the limits: worried when one is close (the same rule that
-  // turns the stock icon urgent), tired when every subscription is maxed out.
+  // Mood follows the limits: tired when every subscription is maxed out,
+  // worried when one is close, panting when one is going too fast.
   readonly property var maxedProviders: {
     var out = []
     for (var i = 0; i < providers.length; i++) {
@@ -148,7 +158,18 @@ Panel {
     for (var i = 0; i < providers.length; i++) if (bindingWindow(providers[i])) withLimits++
     return withLimits > 0 && maxedProviders.length >= withLimits
   }
-  readonly property string petMood: allMaxed ? "tired" : (alarming ? "worried" : "normal")
+  // Panting when the windows the mood watches are being burned well ahead of
+  // an even pace, with room still before the cap; worried and tired win.
+  readonly property var hurriedLimit: {
+    var entries = []
+    for (var i = 0; i < providers.length; i++) {
+      var windows = UsageDisplay.moodWindows(limitWindows(providers[i]), moodWindow)
+      for (var j = 0; j < windows.length; j++)
+        entries.push({ provider: providers[i].providerName || providers[i].providerId || "", window: windows[j] })
+    }
+    return UsageDisplay.hurried(entries, root.nowMs)
+  }
+  readonly property string petMood: allMaxed ? "tired" : (alarming ? "worried" : (hurriedLimit ? "panting" : "normal"))
 
   // A subscription coming back from its cap is worth a little party; one
   // newly hitting its cap gets an "oof".
@@ -220,6 +241,10 @@ Panel {
       if (usage.updating) thinkingDebounce.restart()
       else { thinkingDebounce.stop(); root.petThink(false) }
     }
+    // The clock only ticks while the panel is open, but the mood's pace is
+    // read from it with the panel closed too: each new reading brings it up
+    // to date.
+    function onDataRevisionChanged() { root.nowMs = Date.now() }
   }
   function petThink(on) {
     var hero = panel.loadedContent ? panel.loadedContent.heroPet : null
@@ -497,11 +522,12 @@ Panel {
       panelFlick.contentY = Math.min(panelFlick.contentHeight - panelFlick.height, top + item.height + margin - panelFlick.height)
   }
 
-  // The bar icon lights up when any account new sessions use is nearly out,
-  // or a prepaid balance is down to its last 10%.
+  // Kian worries when any account new sessions use is nearly out in the
+  // windows his mood watches, or a prepaid balance is down to its last 10%.
+  // Tired and the cap reactions stay on the fullest window: a cap is a cap.
   readonly property bool alarming: {
     for (var i = 0; i < providers.length; i++) {
-      var window = bindingWindow(providers[i])
+      var window = UsageDisplay.fullest(UsageDisplay.moodWindows(limitWindows(providers[i]), moodWindow))
       if (window && window.percent >= 0.9) return true
       if (balanceAlarming(providers[i].balance)) return true
     }
@@ -827,6 +853,7 @@ Panel {
         title: title,
         percent: windows[j].percent,
         resetAt: windows[j].resetAt,
+        spanMs: windows[j].spanMs,
         scoped: []
       })
     }
@@ -846,6 +873,29 @@ Panel {
 
   function resetMsFor(w) {
     return UsageWindow.resetInMs(w, root.nowMs)
+  }
+
+  // A meter's fill for a used share: the alarm from 90% on, and with
+  // colorCodeUsage the theme's green, yellow and orange below it.
+  function usageColor(percent) {
+    var level = UsageDisplay.level(percent)
+    if (level === "critical") return root.urgent
+    if (!root.colorCodeUsage) return root.foreground
+    if (level === "high") return petPalette.resolve("theme:orange", petPalette.resolve("theme:red", root.urgent))
+    if (level === "mid") return petPalette.resolve("theme:yellow", root.foreground)
+    return petPalette.resolve("theme:green", root.foreground)
+  }
+
+  // The pace line of a limit's tooltip: how it compares with an even pace,
+  // and where that pace lands it at the reset.
+  function paceText(pace, glyph) {
+    if (!pace || !pace.known || pace.early) return ""
+    var label = pace.ratioPace === "ahead" ? petStrings.t("agents.paceAhead")
+      : (pace.ratioPace === "under" ? petStrings.t("agents.paceUnder") : petStrings.t("agents.paceOnTrack"))
+    var parts = [glyph + " " + label]
+    if (pace.projection === "hits") parts.push(petStrings.t("agents.paceHits").arg(formatDuration(pace.hitsInMs)))
+    else if (pace.projection === "left") parts.push(petStrings.t("agents.paceLeftAtReset").arg(Commons.I18n.formatNumber(pace.leftPct)))
+    return parts.join(" · ")
   }
 
   function formatDuration(ms) {
@@ -1055,9 +1105,16 @@ Panel {
     } else if (worst && worst.percent >= 0.9) {
       list.push({ key: "limit", badge: t.t("tip.badge.limit"), icon: "⚠️", alert: true,
         phrase: t.t("tip.limitNear").arg(worst.provider).arg(worst.title).arg(pctText(worst.percent)) })
-    } else if (worst) {
+    } else if (worst && !root.hurriedLimit) {
       list.push({ key: "limit", badge: t.t("tip.badge.limits"), icon: "✓",
         phrase: t.t("tip.limitsHealthy").arg(worst.provider).arg(worst.title).arg(pctText(worst.percent)) })
+    }
+    // What Kian pants over, said out loud.
+    var hurried = root.hurriedLimit
+    if (hurried) {
+      list.push({ key: "burn", badge: t.t("tip.badge.burn"), icon: "💨",
+        phrase: t.t("tip.burningFast").arg(hurried.provider).arg(root.windowDisplayTitle(hurried.window.title))
+          .arg(root.formatDuration(hurried.pace.hitsInMs)) })
     }
     if (worst && worst.percent >= 0.9 && calmest && calmest.provider !== worst.provider && calmest.percent < 0.5) {
       list.push({ key: "switch", badge: t.t("tip.badge.switch"), icon: "↻",
@@ -2089,6 +2146,7 @@ Panel {
           id: balanceTitle
           textFormat: Text.PlainText
           width: parent.width * 0.3
+          anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           text: petStrings.t("agents.balance")
           color: root.foreground
@@ -2574,6 +2632,16 @@ Panel {
     readonly property var scoped: window && window.scoped ? window.scoped : []
     readonly property bool alarming: window && window.percent >= 0.9
     readonly property real resetMs: root.resetMsFor(window)
+    // Used or left, as the settings say; the alarm and the colors still
+    // follow the used share.
+    readonly property real shown: window ? UsageDisplay.shownFraction(window.percent, root.showAs) : 0
+    readonly property var pace: UsagePacing.forWindow(window, root.nowMs)
+    readonly property string paceGlyph: root.showPace ? UsageDisplay.paceGlyph(pace, LayoutMirroring.enabled) : ""
+    // How far into the window we are, where an even pace would have the
+    // meter by now.
+    readonly property real elapsed: root.showPace && pace.known && window
+      ? UsageWindow.elapsedFraction(UsageWindow.timeMs(window.resetAt), window.spanMs, root.nowMs)
+      : -1
     implicitHeight: Math.max(compactTitle.implicitHeight, compactPercent.implicitHeight, compactValue.implicitHeight)
 
     HoverHandler { id: compactHover }
@@ -2584,10 +2652,13 @@ Panel {
         var lines = []
         if (compact.window) {
           var windowName = root.windowDisplayTitle(compact.window.title)
-          var used = Commons.I18n.formatNumber(Math.round(compact.window.percent * 100))
+          var amount = Commons.I18n.formatNumber(Math.round(compact.shown * 100))
+          var left = root.showAs === "left"
           lines.push(compact.resetMs > 0
-            ? petStrings.t("agents.windowUsedResets").arg(windowName).arg(used).arg(root.formatDuration(compact.resetMs))
-            : petStrings.t("agents.windowUsed").arg(windowName).arg(used))
+            ? petStrings.t(left ? "agents.windowLeftResets" : "agents.windowUsedResets").arg(windowName).arg(amount).arg(root.formatDuration(compact.resetMs))
+            : petStrings.t(left ? "agents.windowLeft" : "agents.windowUsed").arg(windowName).arg(amount))
+          var paceLine = compact.paceGlyph !== "" ? root.paceText(compact.pace, compact.paceGlyph) : ""
+          if (paceLine !== "") lines.push(paceLine)
         }
         if (compact.stale)
           lines.push(compact.fetchedAt > 0 && root.nowMs - compact.fetchedAt > 60000
@@ -2603,6 +2674,8 @@ Panel {
       id: compactTitle
       textFormat: Text.PlainText
       width: parent.width * 0.3
+      // Anchored, not placed, so it mirrors to the right with the rest.
+      anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       text: compact.window ? root.windowDisplayTitle(compact.window.title) : ""
       color: root.foreground
@@ -2627,22 +2700,47 @@ Panel {
       horizontalAlignment: Text.AlignRight
       textFormat: Text.PlainText
       text: compact.window && compact.window.percent >= 0
-        ? Commons.I18n.formatNumber(Math.round(compact.window.percent * 100)) + "%"
+        ? Commons.I18n.formatNumber(Math.round(compact.shown * 100)) + "%"
         : ""
       color: compact.alarming ? root.urgent : root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.bodySmall
     }
 
-    Meter {
+    TextMetrics {
+      id: compactPaceMetrics
+      font: compactPace.font
+      text: "→"
+    }
+
+    // The pace at a glance (↑ ahead, → on track, ↓ under); the tooltip says
+    // where it leads. Its slot is kept while the pace can't be told yet, so
+    // every meter on the page still starts in the same place.
+    Text {
+      id: compactPace
       anchors.left: compactPercent.right
-      anchors.leftMargin: Style.space(10)
+      anchors.leftMargin: root.showPace ? Style.space(3) : 0
+      anchors.verticalCenter: parent.verticalCenter
+      width: root.showPace ? Math.ceil(compactPaceMetrics.advanceWidth) : 0
+      horizontalAlignment: Text.AlignHCenter
+      textFormat: Text.PlainText
+      text: compact.paceGlyph
+      color: compact.pace.ratioPace === "ahead" ? root.foreground : root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+    }
+
+    Meter {
+      anchors.left: compactPace.right
+      anchors.leftMargin: Style.space(root.showPace ? 7 : 10)
       anchors.right: compactValue.left
       anchors.rightMargin: Style.space(16)
       anchors.verticalCenter: parent.verticalCenter
-      value: compact.window ? compact.window.percent : -1
+      value: compact.window ? compact.shown : -1
       alarming: compact.alarming
-      markers: compact.scoped
+      fillColor: compact.window ? root.usageColor(compact.window.percent) : root.foreground
+      pace: compact.elapsed < 0 ? -1 : (root.showAs === "left" ? 1 - compact.elapsed : compact.elapsed)
+      markers: compact.scoped.map(function(s) { return { percent: UsageDisplay.shownFraction(s.percent, root.showAs) } })
     }
 
     // Sized to the widest time left ("19h 40m"), so every meter ends in the
@@ -2675,6 +2773,9 @@ Panel {
     id: meter
     property real value: -1
     property bool alarming: false
+    property color fillColor: alarming ? root.urgent : root.foreground
+    // Where an even pace would have the fill by now (0..1), or -1.
+    property real pace: -1
     property real thickness: Math.max(Style.space(4), Math.round(Style.spacing.controlHeight * 0.14))
 
     // Other allowances on the same clock, drawn as ticks across the track.
@@ -2695,7 +2796,7 @@ Panel {
       height: meterTrack.height
       radius: meterTrack.radius
       width: meterTrack.width * root.clamp(meter.value, 0, 1)
-      color: meter.alarming ? root.urgent : root.foreground
+      color: meter.fillColor
 
       Behavior on width {
         NumberAnimation { duration: Style.duration(160); easing.type: Easing.OutCubic }
@@ -2716,6 +2817,26 @@ Panel {
         readonly property real along: root.clamp(meterTrack.width * root.clamp(Number(modelData.percent), 0, 1) - width / 2, 0, meterTrack.width - width)
         x: LayoutMirroring.enabled ? meterTrack.width - width - along : along
         color: meter.alarming ? root.urgent : root.foreground
+      }
+    }
+
+    // The even-pace tick: a thin accent line in a notch of the popup's
+    // background, so it reads over the fill as well as over the track.
+    Rectangle {
+      visible: meter.pace >= 0
+      width: Math.max(2, Math.round(meter.thickness * 0.4)) + 2
+      height: Math.round(meter.thickness * 1.9) + 2
+      radius: width / 2
+      anchors.verticalCenter: meterTrack.verticalCenter
+      readonly property real along: root.clamp(meterTrack.width * root.clamp(meter.pace, 0, 1) - width / 2, 0, meterTrack.width - width)
+      x: LayoutMirroring.enabled ? meterTrack.width - width - along : along
+      color: root.surface
+
+      Rectangle {
+        anchors.fill: parent
+        anchors.margins: 1
+        radius: width / 2
+        color: Commons.Color.accent
       }
     }
   }

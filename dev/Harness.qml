@@ -179,7 +179,7 @@ ShellRoot {
       // the bodies with the least room.
       Repeater {
         model: [
-          { label: "mood", cells: [{ mood: "normal" }, { mood: "worried" }, { mood: "tired" }, { mood: "asleep" }, { mood: "happy" }] },
+          { label: "mood", cells: [{ mood: "normal" }, { mood: "panting" }, { mood: "worried" }, { mood: "tired" }, { mood: "asleep" }, { mood: "happy" }] },
           { label: "reactions", cells: [{ pose: "yawn" }, { pose: "wake" }, { pose: "startle" }, { pose: "curious" }, { pose: "dizzy" }] },
           { label: "", cells: [{ pose: "wink" }, { pose: "sneeze" }, { pose: "thinking" }, { pose: "oof" }, { pose: "sigh" }] },
           { label: "cyclops", cells: [{ mood: "worried" }, { mood: "asleep" }, { mood: "happy" }, { pose: "wink" }, { pose: "startle" }], set: { eyes: "cyclops", accessory: "none" } },
@@ -220,7 +220,7 @@ ShellRoot {
                   return sheet.lookWith(set)
                 }
                 themePalette: themeColors
-                mood: cell.mood === "worried" || cell.mood === "tired" ? cell.mood : "normal"
+                mood: ["panting", "worried", "tired"].indexOf(cell.mood) >= 0 ? cell.mood : "normal"
                 asleep: cell.mood === "asleep"
                 avatarState: cell.mood === "happy" ? "happy" : "idle"
                 posePreview: cell.modelData.pose || ""

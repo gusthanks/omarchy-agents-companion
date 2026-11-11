@@ -19,7 +19,7 @@ var NEUTRAL = {
   browAsym: 0.0,     // one brow up (thinking, curious)
   // mouth
   mouthShape: "",    // "" (the look's own) | happy (look's, or a smile when it has none)
-                     // | smile | o | o-small | flat | wavy | cat | yawn | grin | frown | none
+                     // | smile | o | o-small | flat | wavy | cat | yawn | grin | frown | pant | none
   mouthOpen: 0.0,    // size of o and yawn
   mouthCurve: 0.0,   // bends the flat mouth: -1 frown .. 1 smile
   mouthX: 0.0,       // sideways shift, units of r
@@ -36,7 +36,7 @@ var NEUTRAL = {
   // skin
   blush: 0.0,
   // floating marks (only when showMarks)
-  mark: "",          // "" | z | zz | ! | ? | ... | sweat | stars
+  mark: "",          // "" | z | zz | ! | ? | ... | sweat | pant | stars
   markAlpha: 1.0,
   // procedural modifiers
   breathRate: 1.0,   // below 0.8 breathes slowly (tired, asleep)
@@ -59,6 +59,10 @@ function ext(a, b) {
 var EXPR = {
   happy:    { eyeShape: "happy", mouthShape: "happy", blinkOk: 0, browAlpha: 0, mark: "" },
   worried:  { browAlpha: 1, browAngle: 1, mouthShape: "wavy", mark: "!" },
+  // Out of breath from burning a limit too fast: heavy lids, a strained
+  // brow, flushed cheeks, an open mouth and quick breaths.
+  panting:  { eyeOpen: 0.72, browAlpha: 0.8, browAngle: 0.45, mouthShape: "pant", mouthOpen: 1,
+              blush: 0.45, mark: "pant", breathRate: 1.6 },
   tired:    { eyeShape: "sleepy", mark: "z", breathRate: 0.65 },
   asleep:   { eyeShape: "closed", mouthShape: "o-small", mark: "zz", breathRate: 0.65,
               gazeLock: 1, gazeX: 0, gazeY: 0, blinkOk: 0, browAlpha: 0 },
