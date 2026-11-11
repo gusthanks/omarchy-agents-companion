@@ -78,8 +78,10 @@ Pronto no rodapé:
 - **Forma**: corpo (bolha, orbe, quadradinho, gota, fantasma, nuvem, ovo, mochi, feijão),
   estilo (sólido ou contorno) e o tamanho do bichinho na barra e no painel (Pequeno /
   Médio / Grande, cada um)
-- **Rosto**: olhos (cápsula, pontinhos, esbugalhados, pixel, sonolentos), boca (nenhuma,
-  sorriso, surpresa, gatinho, reta), bochechas coradas e a **personalidade**: Animado (todas
+- **Rosto**: olhos (cápsula, pontinhos, esbugalhados, pixel, sonolentos, estrela,
+  brilhante, ciclope, coração), boca (nenhuma, sorriso, surpresa, gatinho, reta, presinha,
+  língua, sorrisão, sorriso de lado), o tamanho de cada um (Bem pequeno a Bem grande),
+  bochechas coradas e a **personalidade**: Animado (todas
   as reações e pequenas manias), Calmo (reage a você, sem manias à toa) ou Quieto
   (só poses, sem reações animadas); uma linha **Testar** toca Piscar, Susto, Tontura,
   Bocejo e Festa no palco

@@ -9,7 +9,8 @@ import "PetClips.js" as PetClips
 // object, so the same component renders the bar pet, the panel pet and every
 // preview in the editor.
 //
-// look: { body, eyes, mouth, extra, accessory, cheeks, style, color }
+// look: { body, eyes, mouth, extra, accessory, cheeks, style, color,
+//         eyeSize, mouthSize }
 // mood (set by the host): "normal" | "worried" | "tired"
 Item {
   id: root
@@ -59,6 +60,13 @@ Item {
   readonly property bool cheeks: opt("cheeks", true) === true
   readonly property string fillStyle: opt("style", "solid")
   readonly property string colorChoice: opt("color", "theme")
+  // Eye and mouth size, 0.7..1.4 (1 when missing or hand-edited into junk).
+  function scaleOpt(name) {
+    var v = Number(opt(name, 1))
+    return isFinite(v) ? Math.max(0.7, Math.min(1.4, v)) : 1
+  }
+  readonly property real eyeSize: scaleOpt("eyeSize")
+  readonly property real mouthSize: scaleOpt("mouthSize")
 
   // Shared ThemePalette from the host; resolves "theme:<name>" colors.
   property var themePalette: null
@@ -638,14 +646,17 @@ Item {
   // Where things sit on each body's head, in units of r: how high the top
   // is, how far apart side pieces (ears, horns, bow, flower) go, and how big
   // hats are, so a narrow egg top or a puffy cloud still wears them well.
+  // chin: the lowest a mouth may reach in the middle (the bean's dent, the
+  // ghost's waves), so big mouths and yawns stay on the body.
   readonly property var headFit: ({
-    drop: { top: 1.05, spread: 1, hat: 1 },
-    cloud: { top: 0.84, spread: 1, hat: 0.9 },
-    egg: { top: 1.0, spread: 0.72, hat: 0.82 },
-    mochi: { top: 0.75, spread: 1.04, hat: 1 },
-    bean: { top: 0.74, spread: 1, hat: 1 }
+    drop: { top: 1.05, spread: 1, hat: 1, chin: 0.8 },
+    ghost: { top: 0.92, spread: 1, hat: 1, chin: 0.62 },
+    cloud: { top: 0.84, spread: 1, hat: 0.9, chin: 0.72 },
+    egg: { top: 1.0, spread: 0.72, hat: 0.82, chin: 0.8 },
+    mochi: { top: 0.75, spread: 1.04, hat: 1, chin: 0.78 },
+    bean: { top: 0.74, spread: 1, hat: 1, chin: 0.47 }
   })
-  readonly property var head: root.headFit[root.bodyShape] || { top: 0.92, spread: 1, hat: 1 }
+  readonly property var head: root.headFit[root.bodyShape] || { top: 0.92, spread: 1, hat: 1, chin: 0.8 }
 
   function headTop(cy, r, sy) {
     return cy - r * sy * root.head.top
@@ -719,7 +730,22 @@ Item {
     return e === "" || e === "wide" ? root.eyeStyle : e
   }
 
-  function paintEyes(ctx, cx, cy, r) {
+  // Eyes drawn from the look (they grow when startled), as opposed to the
+  // expressions' own arcs, crosses and spirals.
+  readonly property var lookEyes: ({ capsule: 1, dot: 1, googly: 1, pixel: 1, star: 1, sparkle: 1, cyclops: 1, heart: 1 })
+  // A single eye in the middle: expressions draw one bigger eye and one brow,
+  // and a wink (either eye shut) closes it.
+  readonly property bool oneEye: root.eyeStyle === "cyclops"
+  readonly property string tongueColor: "#f38ba8"
+
+  function disc(ctx, x, y, rad) {
+    ctx.beginPath()
+    ctx.ellipse(x - rad, y - rad, rad * 2, rad * 2)
+    ctx.fill()
+  }
+
+  // topY: the top of the head; brows stay below it.
+  function paintEyes(ctx, cx, cy, r, topY) {
     var f = root.face
     // The cursor's gaze, mixed with the expression's own.
     var gzx = (root.still ? 0 : root.gazeX) * (1 - f.gazeLock) + f.gazeX
@@ -730,108 +756,242 @@ Item {
     var ey = cy - r * 0.08 + gy + f.eyeY * r
     var style = currentEyes()
     var col = root.rgba(root.featureColor, 1)
+    // Eye whites and glints: light on a solid pet, dark on an outline one.
+    var hi = root.solid ? root.rgba(root.foreground, 1) : root.rgba(root.background, 0.9)
     ctx.fillStyle = col
     ctx.strokeStyle = col
     ctx.lineCap = "round"
     ctx.lineJoin = "round"
-    var k = f.eyeScale
-    for (var s = -1; s <= 1; s += 2) {
+    // The look's eye size times the expression's (startled), capped so the
+    // biggest eyes still fit every body. Expression eyes follow the size more
+    // gently; a cyclops's single one is drawn bigger.
+    var size = root.eyeSize
+    var k = Math.min(f.eyeScale * size, 1.6)
+    var kx = (1 + 0.6 * (size - 1)) * (root.oneEye ? 1.45 : 1)
+    // The cyclops's eyeball turns only halfway toward the gaze (its pupil
+    // does the rest) and sits a bit higher, clear of the mouth.
+    var oy = root.oneEye ? ey - gy * 0.5 - r * 0.04 : ey
+    var sides = root.oneEye ? [0] : [-1, 1]
+    for (var i = 0; i < sides.length; i++) {
+      var s = sides[i]
       var ex = cx + s * sp / 2 + gx
-      var open = f.eyeOpen * (s < 0 ? f.eyeOpenL : f.eyeOpenR)
+      var open = f.eyeOpen * (s < 0 ? f.eyeOpenL : (s > 0 ? f.eyeOpenR : Math.min(f.eyeOpenL, f.eyeOpenR)))
       var blink = Math.max(0.08, (root.still ? 1 : root.blink) * open)
       var eye = style
       // A nearly shut eye (a wink) reads better as a happy arc.
-      if (open < 0.3 && (eye === "capsule" || eye === "dot" || eye === "pixel" || eye === "googly")) eye = "happy"
-      if (eye === "capsule") {
-        var w = r * 0.26 * k, h = r * 0.5 * blink * k
-        roundRect(ctx, ex - w / 2, ey - h / 2, w, h, Math.min(w, h) / 2)
-        ctx.fill()
-      } else if (eye === "dot") {
-        ctx.beginPath()
-        ctx.ellipse(ex - r * 0.15 * k, ey - r * 0.15 * blink * k, r * 0.3 * k, r * 0.3 * blink * k)
-        ctx.fill()
-      } else if (eye === "pixel") {
-        var p = r * 0.28 * k
-        ctx.fillRect(ex - p / 2, ey - p * blink / 2, p, p * blink)
-      } else if (eye === "sleepy") {
-        ctx.lineWidth = r * 0.1
-        ctx.beginPath()
-        ctx.arc(ex, ey - r * 0.06, r * 0.17, Math.PI * 0.15, Math.PI * 0.85, false)
-        ctx.stroke()
-      } else if (eye === "closed") {
-        ctx.lineWidth = r * 0.09
-        ctx.beginPath()
-        ctx.moveTo(ex - r * 0.14, ey + r * 0.04)
-        ctx.quadraticCurveTo(ex, ey + r * 0.14, ex + r * 0.14, ey + r * 0.04)
-        ctx.stroke()
-      } else if (eye === "googly") {
-        var er = r * 0.24 * k
-        var ox = ex - gx * 0.5, oy = ey - gy * 0.5
-        ctx.fillStyle = root.solid ? root.rgba(root.foreground, 1) : root.rgba(root.background, 0.9)
-        ctx.beginPath()
-        ctx.ellipse(ox - er, oy - er * blink, er * 2, er * 2 * blink)
-        ctx.fill()
-        ctx.fillStyle = col
-        var pr = er * 0.5
-        var px = ox + gzx * er * 0.45
-        var py = oy + gzy * er * 0.45
-        ctx.beginPath()
-        ctx.ellipse(px - pr, py - pr * blink, pr * 2, pr * 2 * blink)
-        ctx.fill()
-      } else if (eye === "squint") { // > <
-        ctx.lineWidth = r * 0.09
-        ctx.beginPath()
-        ctx.moveTo(ex - s * r * 0.12, ey - r * 0.1)
-        ctx.lineTo(ex + s * r * 0.07, ey)
-        ctx.lineTo(ex - s * r * 0.12, ey + r * 0.1)
-        ctx.stroke()
-      } else if (eye === "x") {
-        ctx.lineWidth = r * 0.08
-        ctx.beginPath()
-        ctx.moveTo(ex - r * 0.11, ey - r * 0.11)
-        ctx.lineTo(ex + r * 0.11, ey + r * 0.11)
-        ctx.moveTo(ex + r * 0.11, ey - r * 0.11)
-        ctx.lineTo(ex - r * 0.11, ey + r * 0.11)
-        ctx.stroke()
-      } else if (eye === "spiral") {
-        ctx.lineWidth = r * 0.06
-        ctx.beginPath()
-        var a0 = root.phase * 4 * s
-        for (var i = 0; i <= 36; i++) {
-          var ang = a0 + s * i * 0.42
-          var rad = r * 0.2 * i / 36
-          var qx = ex + Math.cos(ang) * rad, qy = ey + Math.sin(ang) * rad
-          if (i === 0) ctx.moveTo(qx, qy); else ctx.lineTo(qx, qy)
-        }
-        ctx.stroke()
-      } else { // happy ^ ^
-        ctx.lineWidth = r * 0.11
-        ctx.beginPath()
-        ctx.arc(ex, ey + r * 0.06, r * 0.17, Math.PI * 1.15, Math.PI * 1.85, false)
-        ctx.stroke()
+      if (open < 0.3 && root.lookEyes[eye]) eye = "happy"
+      if (root.lookEyes[eye]) {
+        paintLookEye(ctx, eye, ex, ey, r, k, blink, gx, gy, gzx, gzy, col, hi)
+      } else {
+        var ox = root.oneEye ? cx + gx * 0.5 : ex
+        ctx.save()
+        ctx.translate(ox, oy)
+        ctx.scale(kx, kx)
+        ctx.translate(-ox, -oy)
+        paintExpressionEye(ctx, eye, ox, oy, r, s)
+        ctx.restore()
       }
     }
 
     // Brows: inner ends up when worried (browAngle 1), lifted when startled,
-    // one raised when curious or thinking.
+    // one raised when curious or thinking. They sit higher over bigger eyes.
     if (f.browAlpha > 0.02) {
       if (f.browAlpha < 1) ctx.globalAlpha = f.browAlpha
       ctx.strokeStyle = col
       ctx.lineWidth = r * 0.08
-      for (var b = -1; b <= 1; b += 2) {
-        var bx = cx + b * sp / 2 + gx
-        var lift = r * 0.1 * f.browLift + r * 0.08 * f.browAsym * b
+      var raise = r * 0.2 * (size - 1)
+      if (root.oneEye) {
+        // One brow: worried arches it, cross dips it, curious tilts it.
+        var bc = cx + gx * 0.5
+        var by = Math.max(oy - r * 0.44 - raise - r * 0.1 * f.browLift, topY + r * 0.12)
+        var bw = r * 0.2 * (1 + 0.5 * (size - 1))
         ctx.beginPath()
-        ctx.moveTo(bx - b * r * 0.04, ey - r * (0.35 + 0.05 * f.browAngle) - lift)
-        ctx.lineTo(bx + b * r * 0.16, ey - r * (0.35 - 0.05 * f.browAngle) - lift)
+        ctx.moveTo(bc - bw, by + r * 0.06 * f.browAsym)
+        ctx.lineTo(bc, by - r * 0.07 * f.browAngle)
+        ctx.lineTo(bc + bw, by - r * 0.06 * f.browAsym)
         ctx.stroke()
+      } else {
+        for (var b = -1; b <= 1; b += 2) {
+          var bx = cx + b * sp / 2 + gx
+          var lift = r * 0.1 * f.browLift + r * 0.08 * f.browAsym * b + raise
+          var y1 = ey - r * (0.35 + 0.05 * f.browAngle) - lift
+          var y2 = ey - r * (0.35 - 0.05 * f.browAngle) - lift
+          // Lowered as a whole (keeping its slant) when it would leave the head.
+          var drop = Math.max(0, topY + r * 0.16 - Math.min(y1, y2))
+          ctx.beginPath()
+          ctx.moveTo(bx - b * r * 0.04, y1 + drop)
+          ctx.lineTo(bx + b * r * 0.16, y2 + drop)
+          ctx.stroke()
+        }
       }
       ctx.globalAlpha = 1
     }
-    return { sp: sp, ey: ey, gx: gx, gy: gy }
+    // The face (mouth, cheeks, glasses) follows the cyclops's eyeball.
+    return { sp: sp, ey: root.oneEye ? ey - gy * 0.5 : ey, gx: gx, gy: gy }
   }
 
-  function paintMouth(ctx, cx, r, eyes) {
+  // One of the look's eyes at (ex, ey); k is its size, blink how open it is.
+  function paintLookEye(ctx, eye, ex, ey, r, k, blink, gx, gy, gzx, gzy, col, hi) {
+    if (eye === "capsule") {
+      var w = r * 0.26 * k, h = r * 0.5 * blink * k
+      roundRect(ctx, ex - w / 2, ey - h / 2, w, h, Math.min(w, h) / 2)
+      ctx.fill()
+    } else if (eye === "dot") {
+      ctx.beginPath()
+      ctx.ellipse(ex - r * 0.15 * k, ey - r * 0.15 * blink * k, r * 0.3 * k, r * 0.3 * blink * k)
+      ctx.fill()
+    } else if (eye === "pixel") {
+      var p = r * 0.28 * k
+      ctx.fillRect(ex - p / 2, ey - p * blink / 2, p, p * blink)
+    } else if (eye === "googly") {
+      var er = r * 0.24 * k
+      var ox = ex - gx * 0.5, oy = ey - gy * 0.5
+      ctx.fillStyle = hi
+      ctx.beginPath()
+      ctx.ellipse(ox - er, oy - er * blink, er * 2, er * 2 * blink)
+      ctx.fill()
+      ctx.fillStyle = col
+      var pr = er * 0.5
+      var px = ox + gzx * er * 0.45
+      var py = oy + gzy * er * 0.45
+      ctx.beginPath()
+      ctx.ellipse(px - pr, py - pr * blink, pr * 2, pr * 2 * blink)
+      ctx.fill()
+    } else if (eye === "star") {
+      // Five points, softened by a thin stroke of the same ink.
+      var so = r * 0.2 * k, si = so * 0.48
+      var sy = ey + r * 0.02 * k
+      ctx.lineWidth = r * 0.05
+      ctx.beginPath()
+      for (var n = 0; n < 10; n++) {
+        var a = -Math.PI / 2 + n * Math.PI / 5
+        var sr = n % 2 === 0 ? so : si
+        if (n === 0) ctx.moveTo(ex + Math.cos(a) * sr, sy + Math.sin(a) * sr * blink)
+        else ctx.lineTo(ex + Math.cos(a) * sr, sy + Math.sin(a) * sr * blink)
+      }
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+    } else if (eye === "sparkle") {
+      // A tall anime eye with two glints (gone while it blinks).
+      var sw = r * 0.17 * k, sh = r * 0.23 * k
+      ctx.beginPath()
+      ctx.ellipse(ex - sw, ey - sh * blink, sw * 2, sh * 2 * blink)
+      ctx.fill()
+      if (blink > 0.5) {
+        ctx.fillStyle = hi
+        disc(ctx, ex - sw * 0.34, ey - sh * 0.38 * blink, sw * 0.36)
+        disc(ctx, ex + sw * 0.36, ey + sh * 0.4 * blink, sw * 0.17)
+        ctx.fillStyle = col
+      }
+    } else if (eye === "heart") {
+      // Beats softly while the pet is animated.
+      var beat = root.animated && !root.still ? 1 + 0.08 * Math.pow(Math.max(0, Math.sin(root.phase * 6)), 8) : 1
+      var hw = r * 0.19 * k * beat, hh = r * 0.17 * k * beat * blink
+      var hy = ey + r * 0.01 * k
+      ctx.beginPath()
+      ctx.moveTo(ex, hy + hh)
+      ctx.bezierCurveTo(ex - 0.3 * hw, hy + 0.75 * hh, ex - hw, hy + 0.3 * hh, ex - hw, hy - 0.3 * hh)
+      ctx.bezierCurveTo(ex - hw, hy - 0.9 * hh, ex - 0.3 * hw, hy - 1.1 * hh, ex, hy - 0.55 * hh)
+      ctx.bezierCurveTo(ex + 0.3 * hw, hy - 1.1 * hh, ex + hw, hy - 0.9 * hh, ex + hw, hy - 0.3 * hh)
+      ctx.bezierCurveTo(ex + hw, hy + 0.3 * hh, ex + 0.3 * hw, hy + 0.75 * hh, ex, hy + hh)
+      ctx.fill()
+    } else if (eye === "cyclops") {
+      // One big eyeball; the pupil looks around inside it.
+      var cr = r * 0.29 * k
+      var cx0 = ex - gx * 0.5, cy0 = ey - gy * 0.5 - r * 0.04
+      ctx.fillStyle = hi
+      ctx.beginPath()
+      ctx.ellipse(cx0 - cr, cy0 - cr * blink, cr * 2, cr * 2 * blink)
+      ctx.fill()
+      // An outline pet's eyeball is dark on a dark body: rim it in ink.
+      if (!root.solid) {
+        ctx.lineWidth = r * 0.05
+        ctx.stroke()
+      }
+      ctx.fillStyle = col
+      var ir = cr * 0.52
+      var ix = cx0 + gzx * cr * 0.4, iy = cy0 + gzy * cr * 0.4 * blink
+      ctx.beginPath()
+      ctx.ellipse(ix - ir, iy - ir * blink, ir * 2, ir * 2 * blink)
+      ctx.fill()
+      if (blink > 0.5) {
+        ctx.fillStyle = hi
+        disc(ctx, ix - ir * 0.36, iy - ir * 0.4, ir * 0.28)
+        ctx.fillStyle = col
+      }
+    }
+  }
+
+  // The expressions' own eyes, drawn at size 1 (paintEyes scales them).
+  // s: -1 left, 1 right, 0 the cyclops's single eye.
+  function paintExpressionEye(ctx, eye, ex, ey, r, s) {
+    if (eye === "sleepy") {
+      ctx.lineWidth = r * 0.1
+      ctx.beginPath()
+      ctx.arc(ex, ey - r * 0.06, r * 0.17, Math.PI * 0.15, Math.PI * 0.85, false)
+      ctx.stroke()
+    } else if (eye === "closed") {
+      ctx.lineWidth = r * 0.09
+      ctx.beginPath()
+      ctx.moveTo(ex - r * 0.14, ey + r * 0.04)
+      ctx.quadraticCurveTo(ex, ey + r * 0.14, ex + r * 0.14, ey + r * 0.04)
+      ctx.stroke()
+    } else if (eye === "squint") { // > <
+      ctx.lineWidth = r * 0.09
+      ctx.beginPath()
+      if (s === 0) { // one eye squeezed shut: ><
+        for (var d = -1; d <= 1; d += 2) {
+          ctx.moveTo(ex + d * r * 0.19, ey - r * 0.09)
+          ctx.lineTo(ex + d * r * 0.06, ey)
+          ctx.lineTo(ex + d * r * 0.19, ey + r * 0.09)
+        }
+      } else {
+        ctx.moveTo(ex - s * r * 0.12, ey - r * 0.1)
+        ctx.lineTo(ex + s * r * 0.07, ey)
+        ctx.lineTo(ex - s * r * 0.12, ey + r * 0.1)
+      }
+      ctx.stroke()
+    } else if (eye === "x") {
+      ctx.lineWidth = r * 0.08
+      ctx.beginPath()
+      ctx.moveTo(ex - r * 0.11, ey - r * 0.11)
+      ctx.lineTo(ex + r * 0.11, ey + r * 0.11)
+      ctx.moveTo(ex + r * 0.11, ey - r * 0.11)
+      ctx.lineTo(ex - r * 0.11, ey + r * 0.11)
+      ctx.stroke()
+    } else if (eye === "spiral") {
+      var dir = s || 1
+      ctx.lineWidth = r * 0.06
+      ctx.beginPath()
+      var a0 = root.phase * 4 * dir
+      for (var i = 0; i <= 36; i++) {
+        var ang = a0 + dir * i * 0.42
+        var rad = r * 0.2 * i / 36
+        var qx = ex + Math.cos(ang) * rad, qy = ey + Math.sin(ang) * rad
+        if (i === 0) ctx.moveTo(qx, qy); else ctx.lineTo(qx, qy)
+      }
+      ctx.stroke()
+    } else { // happy ^ ^
+      ctx.lineWidth = r * 0.11
+      ctx.beginPath()
+      ctx.arc(ex, ey + r * 0.06, r * 0.17, Math.PI * 1.15, Math.PI * 1.85, false)
+      ctx.stroke()
+    }
+  }
+
+  // How far each mouth reaches below its anchor, in units of r.
+  function mouthDepth(m, mo) {
+    if (m === "o") return 0.03 + 0.08 * (1 + 0.8 * mo)
+    if (m === "yawn") return 0.06 + 0.34 * mo
+    if (m === "fang") return 0.18
+    if (m === "tongue") return 0.16
+    if (m === "grin") return 0.1
+    if (m === "o-small") return 0.08
+    return 0.06
+  }
+
+  function paintMouth(ctx, cx, r, eyes, chinY) {
     var f = root.face
     var m = root.mouthStyle
     if (f.mouthShape === "happy") { if (m === "none") m = "smile" }
@@ -839,12 +999,28 @@ Item {
     if (m === "none") return
     var mo = f.mouthOpen
     var mx = cx + eyes.gx * 0.8 + f.mouthX * r
-    var my = eyes.ey + r * 0.38
+    // Bigger eyes (and the cyclops's) push the mouth down a little.
+    var my = eyes.ey + r * (0.38 + 0.1 * (root.eyeSize - 1) + (root.oneEye ? 0.08 : 0))
+    // The look's mouth size scales every mouth, the reactions' too. A mouth
+    // that would hang past the chin shrinks a little, then moves up.
+    var ms = root.mouthSize
+    var depth = root.mouthDepth(m, mo) * r
+    if (my + depth * ms > chinY) {
+      ms = Math.max(Math.min(0.75, ms), (chinY - my) / depth)
+      my = Math.min(my, chinY - depth * ms)
+    }
     var col = root.rgba(root.featureColor, 1)
+    ctx.save()
+    if (ms !== 1) {
+      ctx.translate(mx, my)
+      ctx.scale(ms, ms)
+      ctx.translate(-mx, -my)
+    }
     ctx.strokeStyle = col
     ctx.fillStyle = col
     ctx.lineWidth = r * 0.08
     ctx.lineCap = "round"
+    ctx.lineJoin = "round"
     ctx.beginPath()
     if (m === "smile") {
       ctx.arc(mx, my - r * 0.08, r * 0.14, Math.PI * 0.2, Math.PI * 0.8, false)
@@ -861,10 +1037,62 @@ Item {
       ctx.ellipse(mx - yw / 2, my - r * 0.06, yw, yh)
       ctx.fill()
     } else if (m === "grin") {
+      // A big open smile, with a tongue at the bottom.
       ctx.moveTo(mx - r * 0.15, my - r * 0.05)
       ctx.arc(mx, my - r * 0.05, r * 0.15, Math.PI, 0, true)
       ctx.closePath()
       ctx.fill()
+      ctx.clip()
+      ctx.fillStyle = root.tongueColor
+      root.disc(ctx, mx, my + r * 0.12, r * 0.09)
+    } else if (m === "fang") {
+      // A small smile with one little fang hanging from it (a light tooth
+      // with an ink rim, so it reads as a tooth and not a blot).
+      var fr = r * 0.14, fc = my - r * 0.08
+      var a1 = Math.PI * 0.2, a2 = Math.PI * 0.42
+      var x1 = mx + Math.cos(a1) * fr, y1 = fc + Math.sin(a1) * fr
+      var x2 = mx + Math.cos(a2) * fr, y2 = fc + Math.sin(a2) * fr
+      ctx.moveTo(x1, y1)
+      ctx.lineTo((x1 + x2) / 2 + r * 0.01, Math.max(y1, y2) + r * 0.12)
+      ctx.lineTo(x2, y2)
+      ctx.closePath()
+      ctx.fillStyle = root.solid ? root.rgba(root.foreground, 1) : root.rgba(root.background, 0.9)
+      ctx.fill()
+      ctx.lineWidth = r * 0.03
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.lineWidth = r * 0.08
+      ctx.arc(mx, fc, fr, Math.PI * 0.2, Math.PI * 0.8, false)
+      ctx.stroke()
+    } else if (m === "tongue") {
+      // A smile with the tongue sticking out from under it.
+      var tw = r * 0.08, ty = my + r * 0.03
+      ctx.moveTo(mx - tw, ty)
+      ctx.lineTo(mx - tw, ty + r * 0.05)
+      ctx.arc(mx, ty + r * 0.05, tw, Math.PI, 0, true)
+      ctx.lineTo(mx + tw, ty)
+      ctx.closePath()
+      ctx.fillStyle = root.tongueColor
+      ctx.fill()
+      ctx.lineWidth = r * 0.035
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(mx, ty + r * 0.03)
+      ctx.lineTo(mx, ty + r * 0.08)
+      ctx.lineWidth = r * 0.025
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.lineWidth = r * 0.08
+      ctx.arc(mx, my - r * 0.1, r * 0.16, Math.PI * 0.18, Math.PI * 0.82, false)
+      ctx.stroke()
+    } else if (m === "smirk") {
+      // A sideways half smile: flat on the left, curling up on the right.
+      ctx.moveTo(mx - r * 0.1, my + r * 0.02)
+      ctx.quadraticCurveTo(mx + r * 0.06, my + r * 0.06, mx + r * 0.14, my - r * 0.05)
+      // and a dimple at the curl
+      ctx.moveTo(mx + r * 0.11, my - r * 0.09)
+      ctx.quadraticCurveTo(mx + r * 0.16, my - r * 0.07, mx + r * 0.17, my - r * 0.02)
+      ctx.stroke()
     } else if (m === "frown") {
       ctx.arc(mx, my + r * 0.1, r * 0.14, Math.PI * 1.2, Math.PI * 1.8, false)
       ctx.stroke()
@@ -884,16 +1112,30 @@ Item {
       ctx.quadraticCurveTo(mx + r * 0.07, my + r * 0.06, mx + r * 0.14, my)
       ctx.stroke()
     }
+    ctx.restore()
   }
 
   // Glasses, bow and flower sit on the face; hats are drawn by paintHeadwear.
   function paintAccessory(ctx, cx, cy, r, sx, sy, eyes) {
     var a = root.accessory
     var ink = root.rgba(root.featureColor, 1)
-    if (a === "glasses") {
+    if (a === "glasses" && root.oneEye) {
+      // One round lens around the cyclops's eye, with short side arms.
       ctx.strokeStyle = ink
       ctx.lineWidth = r * 0.07
-      var gr = r * 0.25
+      var lx = cx + eyes.gx * 0.5, ly = eyes.ey - r * 0.04, lr = r * (0.29 * root.eyeSize + 0.07)
+      ctx.beginPath()
+      ctx.ellipse(lx - lr, ly - lr, lr * 2, lr * 2)
+      ctx.moveTo(lx - lr, ly - r * 0.04)
+      ctx.lineTo(lx - lr - r * 0.16, ly - r * 0.08)
+      ctx.moveTo(lx + lr, ly - r * 0.04)
+      ctx.lineTo(lx + lr + r * 0.16, ly - r * 0.08)
+      ctx.stroke()
+    } else if (a === "glasses") {
+      ctx.strokeStyle = ink
+      ctx.lineWidth = r * 0.07
+      // Grow with the eyes, a little less so the lenses never touch.
+      var gr = r * 0.25 * (1 + 0.45 * (root.eyeSize - 1))
       for (var s = -1; s <= 1; s += 2) {
         ctx.beginPath()
         ctx.ellipse(cx + s * eyes.sp / 2 + eyes.gx * 0.5 - gr, eyes.ey - gr, gr * 2, gr * 2)
@@ -1124,7 +1366,7 @@ Item {
     }
     if (shapeOnly) return
 
-    var eyes = paintEyes(ctx, cx, cy, r)
+    var eyes = paintEyes(ctx, cx, cy, r, headTop(cy, r, sy))
 
     if (root.cheeks) {
       ctx.fillStyle = root.solid ? root.rgba(root.background, 0.18) : root.rgba(root.baseColor, 0.45)
@@ -1143,7 +1385,7 @@ Item {
       }
     }
 
-    paintMouth(ctx, cx, r, eyes)
+    paintMouth(ctx, cx, r, eyes, cy + r * sy * root.head.chin)
     paintAccessory(ctx, cx, cy, r, sx, sy, eyes)
     paintHeadwear(ctx, cx, cy, r, sx, sy)
     if (moved) ctx.restore()

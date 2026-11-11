@@ -10,7 +10,7 @@ var NEUTRAL = {
   eyeOpen: 1.0,      // multiplied with the automatic blink
   eyeOpenL: 1.0,     // per-eye multipliers (a wink closes one)
   eyeOpenR: 1.0,
-  eyeScale: 1.0,     // bigger eyes when startled
+  eyeScale: 1.0,     // bigger eyes when startled (times the look's eyeSize)
   eyeY: 0.0,         // extra vertical offset, units of r
   // brows (hidden at neutral)
   browAlpha: 0.0,

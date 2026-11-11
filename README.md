@@ -74,8 +74,9 @@ bottom:
 
 - **Shape**: body (blob, orb, squircle, drop, ghost, cloud, egg, mochi, bean), style
   (solid or outline), and the pet's size in the bar and in the panel (S / M / L each)
-- **Face**: eyes (capsule, dots, googly, pixel, sleepy), mouth (none, smile, surprised,
-  cat, flat), blush cheeks, and the **personality**: Lively (every reaction and little
+- **Face**: eyes (capsule, dots, googly, pixel, sleepy, star, sparkly, cyclops, heart),
+  mouth (none, smile, surprised, cat, flat, fang, tongue, grin, smirk), the size of each
+  (XS to XL), blush cheeks, and the **personality**: Lively (every reaction and little
   fidgets), Calm (reacts to you, no idle fidgets) or Still (poses only, no animated
   reactions); a **Try** row plays Wink, Startle, Dizzy, Yawn and Party (celebrate) on the
   stage

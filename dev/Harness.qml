@@ -139,9 +139,18 @@ ShellRoot {
         { label: "body", key: "body", options: ["blob", "orb", "squircle", "drop", "ghost"] },
         { label: "", key: "body", options: ["cloud", "egg", "mochi", "bean"] },
         { label: "eyes", key: "eyes", options: ["capsule", "dot", "googly", "pixel", "sleepy"] },
+        { label: "", key: "eyes", options: ["star", "sparkle", "cyclops", "heart"] },
+        { label: "mouth", key: "mouth", options: ["none", "smile", "o", "cat", "flat"] },
+        { label: "", key: "mouth", options: ["fang", "tongue", "grin", "smirk"] },
         { label: "head", key: "extra", options: ["none", "antenna", "leaf", "ears", "horns"] },
         { label: "accessory", key: "accessory", options: ["glasses", "hat", "beanie", "bow", "flower"] }
       ]
+      function lookWith(set) {
+        var l = {}
+        for (var k in shell.petLook) l[k] = shell.petLook[k]
+        for (var j in set) l[j] = set[j]
+        return l
+      }
       Repeater {
         model: sheet.rows
         Row {
@@ -154,60 +163,73 @@ ShellRoot {
             Pet.BlobAvatar {
               required property string modelData
               size: 64
-              look: { var l = {}; for (var k in shell.petLook) l[k] = shell.petLook[k]; l[sheetRow.modelData.key] = modelData; return l }
+              look: { var set = {}; set[sheetRow.modelData.key] = modelData; return sheet.lookWith(set) }
               themePalette: themeColors
               interactive: false; animated: false; lively: false; seasonal: false
             }
           }
         }
       }
-      Row {
-        spacing: 8
-        Text { width: 84; anchors.verticalCenter: parent.verticalCenter; text: "mood"; color: shell.dim; font.family: Commons.Style.font.family; font.pixelSize: 13 }
-        Repeater {
-          model: ["normal", "worried", "tired", "asleep", "happy"]
-          Pet.BlobAvatar {
-            required property string modelData
-            size: 64
-            look: shell.petLook
-            themePalette: themeColors
-            mood: modelData === "worried" || modelData === "tired" ? modelData : "normal"
-            asleep: modelData === "asleep"
-            avatarState: modelData === "happy" ? "happy" : "idle"
-            interactive: false; animated: false; lively: false; seasonal: false
-          }
-        }
-      }
-      // Reactions, frozen at their peak frame (PetClips poseAt), captioned.
+      // Captioned cells: a look change, a mood or a reaction frozen at its
+      // peak frame (PetClips poseAt). Sizes are checked at their extremes on
+      // the bodies with the least room.
       Repeater {
         model: [
-          { label: "reactions", names: ["yawn", "wake", "startle", "curious", "dizzy"] },
-          { label: "", names: ["wink", "sneeze", "thinking", "oof", "sigh"] }
+          { label: "mood", cells: [{ mood: "normal" }, { mood: "worried" }, { mood: "tired" }, { mood: "asleep" }, { mood: "happy" }] },
+          { label: "reactions", cells: [{ pose: "yawn" }, { pose: "wake" }, { pose: "startle" }, { pose: "curious" }, { pose: "dizzy" }] },
+          { label: "", cells: [{ pose: "wink" }, { pose: "sneeze" }, { pose: "thinking" }, { pose: "oof" }, { pose: "sigh" }] },
+          { label: "cyclops", cells: [{ mood: "worried" }, { mood: "asleep" }, { mood: "happy" }, { pose: "wink" }, { pose: "startle" }], set: { eyes: "cyclops", accessory: "none" } },
+          { label: "", cells: [{ pose: "curious" }, { pose: "thinking" }, { pose: "dizzy" }, { pose: "yawn" }, { pose: "oof" }], set: { eyes: "cyclops", accessory: "none" } },
+          { label: "size", cells: [
+            { caption: "0.7", set: { eyeSize: 0.7, mouthSize: 0.7, eyes: "capsule", mouth: "tongue", accessory: "none" } },
+            { caption: "1.4 mochi", set: { eyeSize: 1.4, mouthSize: 1.4, body: "mochi", eyes: "capsule", mouth: "grin", accessory: "none" } },
+            { caption: "1.4 bean", set: { eyeSize: 1.4, mouthSize: 1.4, body: "bean", eyes: "sparkle", mouth: "tongue", accessory: "none" } },
+            { caption: "1.4 egg", set: { eyeSize: 1.4, mouthSize: 1.4, body: "egg", eyes: "googly", mouth: "fang" } },
+            { caption: "1.4 cloud", set: { eyeSize: 1.4, mouthSize: 1.4, body: "cloud", eyes: "cyclops", mouth: "smirk" } }
+          ] },
+          { label: "", cells: [
+            { caption: "startle mochi", pose: "startle", set: { eyeSize: 1.4, mouthSize: 1.4, body: "mochi", eyes: "capsule", accessory: "none" } },
+            { caption: "startle bean", pose: "startle", set: { eyeSize: 1.4, mouthSize: 1.4, body: "bean", eyes: "cyclops", accessory: "none" } },
+            { caption: "yawn bean", pose: "yawn", set: { eyeSize: 1.4, mouthSize: 1.4, body: "bean", eyes: "star", accessory: "none" } },
+            { caption: "worried egg", mood: "worried", set: { eyeSize: 1.4, mouthSize: 1.4, body: "egg", eyes: "heart", accessory: "none" } },
+            { caption: "glasses 1.4", set: { eyeSize: 1.4, mouthSize: 1.4, body: "orb", eyes: "dot", accessory: "glasses" } }
+          ] }
         ]
         Row {
-          id: reactRow
+          id: cellRow
           required property var modelData
           spacing: 8
-          Text { width: 84; y: 22; text: reactRow.modelData.label; color: shell.dim; font.family: Commons.Style.font.family; font.pixelSize: 13 }
+          Text { width: 84; y: 22; text: cellRow.modelData.label; color: shell.dim; font.family: Commons.Style.font.family; font.pixelSize: 13 }
           Repeater {
-            model: reactRow.modelData.names
+            model: cellRow.modelData.cells
             Column {
-              required property string modelData
+              id: cell
+              required property var modelData
+              readonly property string mood: modelData.mood || ""
               spacing: 0
               Pet.BlobAvatar {
                 size: 64
-                look: shell.petLook
+                look: {
+                  var set = {}, k
+                  for (k in cellRow.modelData.set || {}) set[k] = cellRow.modelData.set[k]
+                  for (k in cell.modelData.set || {}) set[k] = cell.modelData.set[k]
+                  return sheet.lookWith(set)
+                }
                 themePalette: themeColors
-                posePreview: parent.modelData
+                mood: cell.mood === "worried" || cell.mood === "tired" ? cell.mood : "normal"
+                asleep: cell.mood === "asleep"
+                avatarState: cell.mood === "happy" ? "happy" : "idle"
+                posePreview: cell.modelData.pose || ""
                 interactive: false; animated: false; lively: false; seasonal: false
               }
               Text {
                 width: 64
                 horizontalAlignment: Text.AlignHCenter
-                text: parent.modelData
+                text: cell.modelData.caption || cell.modelData.pose || cell.mood
                 color: shell.dim
                 font.family: Commons.Style.font.family
                 font.pixelSize: 10
+                elide: Text.ElideRight
               }
             }
           }
@@ -249,7 +271,7 @@ ShellRoot {
         themePalette: themeColors
         tab: parent.tabIndex
         Component.onCompleted: {
-          var cursor = [{ kind: "pet.body", index: 7 }, { kind: "pet.eyes", index: 2 }, { kind: "pet.accessory", index: 4 },
+          var cursor = [{ kind: "pet.body", index: 7 }, { kind: "pet.eyes", index: 7 }, { kind: "pet.accessory", index: 4 },
                         { kind: "pet.swatch", index: 5 }, { kind: "pet.card", index: 1 }][tab]
           keyTarget = cursor
           syncTryOn(cursor)
@@ -376,6 +398,12 @@ ShellRoot {
             var mixed = e.sanitizeBackup({ agentsPetBackup: 1, size: "s", barSize: "l" })
             console.log("CHECK legacy size bar=" + legacy.barSize + " panel=" + legacy.panelSize
                         + " mixed bar=" + mixed.barSize + " panel=" + mixed.panelSize)
+            // Eye / mouth size: missing -> 1, junk -> 1, off-step -> nearest step.
+            console.log("CHECK scales missing=" + e.sanitize({}).eyeSize + " junk=" + e.sanitize({ eyeSize: "9x" }).eyeSize
+                        + " near=" + e.sanitize({ eyeSize: 1.33 }).eyeSize + " low=" + e.sanitize({ mouthSize: 0.1 }).mouthSize)
+            e.setTab(1, false)
+            e.syncTryOn({ kind: "pet.mouthSize", index: 4 })
+            console.log("CHECK size tryOn " + JSON.stringify(e.tryOn) + " stage mouthSize=" + e.previewLook.mouthSize)
           }
           else if (s === 8) {
             var ed = fileEditor

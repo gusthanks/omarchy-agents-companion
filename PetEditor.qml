@@ -64,12 +64,12 @@ Item {
 
   readonly property string home: Quickshell.env("HOME") || ""
 
-  readonly property var defaults: ({ body: "blob", eyes: "capsule", mouth: "none", extra: "none", accessory: "none", cheeks: true, style: "solid", color: "theme" })
+  readonly property var defaults: ({ body: "blob", eyes: "capsule", mouth: "none", extra: "none", accessory: "none", cheeks: true, style: "solid", color: "theme", eyeSize: 1, mouthSize: 1 })
 
   readonly property var traits: [
     { key: "body", options: ["blob", "orb", "squircle", "drop", "ghost", "cloud", "egg", "mochi", "bean"] },
-    { key: "eyes", options: ["capsule", "dot", "googly", "pixel", "sleepy"] },
-    { key: "mouth", options: ["none", "smile", "o", "cat", "flat"] },
+    { key: "eyes", options: ["capsule", "dot", "googly", "pixel", "sleepy", "star", "sparkle", "cyclops", "heart"] },
+    { key: "mouth", options: ["none", "smile", "o", "cat", "flat", "fang", "tongue", "grin", "smirk"] },
     { key: "extra", options: ["none", "antenna", "leaf", "ears", "horns"] },
     { key: "accessory", options: ["none", "glasses", "hat", "beanie", "bow", "flower"] },
     { key: "style", options: ["solid", "outline"] },
@@ -82,12 +82,37 @@ Item {
 
   readonly property var optionLabels: ({
     body: { blob: "Blob", orb: "Orb", squircle: "Squircle", drop: "Drop", ghost: "Ghost", cloud: "Cloud", egg: "Egg", mochi: "Mochi", bean: "Bean" },
-    eyes: { capsule: "Capsule", dot: "Dots", googly: "Googly", pixel: "Pixel", sleepy: "Sleepy" },
-    mouth: { none: "None", smile: "Smile", o: "Surprised", cat: "Cat", flat: "Flat" },
+    eyes: { capsule: "Capsule", dot: "Dots", googly: "Googly", pixel: "Pixel", sleepy: "Sleepy", star: "Star", sparkle: "Sparkly", cyclops: "Cyclops", heart: "Heart" },
+    mouth: { none: "None", smile: "Smile", o: "Surprised", cat: "Cat", flat: "Flat", fang: "Fang", tongue: "Tongue", grin: "Grin", smirk: "Smirk" },
     extra: { none: "None", antenna: "Antenna", leaf: "Leaf", ears: "Ears", horns: "Horns" },
     accessory: { none: "None", glasses: "Glasses", hat: "Top hat", beanie: "Beanie", bow: "Bow", flower: "Flower" },
     style: { solid: "Solid", outline: "Outline" }
   })
+  // Eye and mouth size: numbers in the look, picked from five steps.
+  readonly property var lookScales: ["eyeSize", "mouthSize"]
+  readonly property var scaleSteps: [0.7, 0.85, 1, 1.2, 1.4]
+  // The nearest step; 1 when missing or not a number.
+  function scaleStep(v) {
+    var n = Number(v)
+    if (v === undefined || v === null || v === "" || !isFinite(n)) return 1
+    var best = 1
+    for (var i = 0; i < root.scaleSteps.length; i++)
+      if (Math.abs(root.scaleSteps[i] - n) < Math.abs(best - n)) best = root.scaleSteps[i]
+    return best
+  }
+  readonly property var scaleOptions: [
+    { value: "0.7", label: "XS", tooltip: strings.t("pet.size.xs", "Extra small") },
+    { value: "0.85", label: "S", tooltip: strings.t("pet.size.s", "Small") },
+    { value: "1", label: "M", tooltip: strings.t("pet.size.m", "Medium") },
+    { value: "1.2", label: "L", tooltip: strings.t("pet.size.l", "Large") },
+    { value: "1.4", label: "XL", tooltip: strings.t("pet.size.xl", "Extra large") }
+  ]
+  readonly property var sizeOptions: [
+    { value: "s", label: "S", tooltip: strings.t("pet.size.s", "Small") },
+    { value: "m", label: "M", tooltip: strings.t("pet.size.m", "Medium") },
+    { value: "l", label: "L", tooltip: strings.t("pet.size.l", "Large") }
+  ]
+
   function optionName(key, val) {
     var labels = root.optionLabels[key]
     return strings.t("pet.opt." + key + "." + val, labels && labels[val] ? labels[val] : String(val))
@@ -140,6 +165,7 @@ Item {
     }
     var c = String(raw.color || "")
     out.color = c === "theme" || /^theme:[a-z_]+$/.test(c) || /^#[0-9a-fA-F]{6}$/.test(c) ? c : "theme"
+    for (var j = 0; j < root.lookScales.length; j++) out[root.lookScales[j]] = root.scaleStep(raw[root.lookScales[j]])
     return out
   }
 
@@ -302,6 +328,9 @@ Item {
       next[t.key] = t.options[Math.floor(Math.random() * t.options.length)]
     }
     next.color = root.swatches[Math.floor(Math.random() * root.swatches.length)]
+    // Sizes stay near the middle: the extremes are a deliberate choice.
+    var tasteful = [0.85, 1, 1, 1.2]
+    for (var j = 0; j < root.lookScales.length; j++) next[root.lookScales[j]] = tasteful[Math.floor(Math.random() * tasteful.length)]
     root.tryOn = null
     root.lookEdited(next)
     preview.triggerHappy()
@@ -602,8 +631,10 @@ Item {
       rows.push(root.cells("pet.barSize", 3))
       rows.push(root.cells("pet.panelSize", 3))
     } else if (root.tab === 1) {
-      rows.push(root.cells("pet.eyes", 5))
-      rows.push(root.cells("pet.mouth", 5))
+      rows = rows.concat(root.chunks("pet.eyes", root.optionsOf("eyes").length, 5))
+      rows.push(root.cells("pet.eyeSize", 5))
+      rows = rows.concat(root.chunks("pet.mouth", root.optionsOf("mouth").length, 5))
+      rows.push(root.cells("pet.mouthSize", 5))
       rows.push([{ kind: "pet.cheeks", index: 0 }])
       rows.push(root.cells("pet.personality", 3))
       rows.push(root.cells("pet.react", root.previewReactions.length))
@@ -632,6 +663,8 @@ Item {
     if (root.chipKeys.indexOf(k) >= 0) {
       var opts = root.optionsOf(k)
       if (target.index < opts.length) root.tryOn = { key: k, val: opts[target.index] }
+    } else if (root.lookScales.indexOf(k) >= 0 && target.index < root.scaleSteps.length) {
+      root.tryOn = { key: k, val: root.scaleSteps[target.index] }
     } else if (k === "swatch" && target.index < root.swatches.length) {
       root.tryOn = { key: "color", val: root.swatches[target.index] }
     }
@@ -653,6 +686,7 @@ Item {
     if (k === "name") root.focusName()
     else if (k === "random") root.randomize()
     else if (k === "barSize" || k === "panelSize") root.editSize(k, ["s", "m", "l"][i])
+    else if (root.lookScales.indexOf(k) >= 0) root.commit(k, root.scaleSteps[i])
     else if (k === "tab") root.setTab(i, true)
     else if (root.chipKeys.indexOf(k) >= 0) root.commit(k, root.optionsOf(k)[i])
     else if (k === "style") root.commit("style", ["solid", "outline"][i])
@@ -721,19 +755,22 @@ Item {
   readonly property real swatchSize: Style.space(28)
   readonly property real swatchGap: Math.max(Style.space(4), Math.floor((root.width - 8 * root.swatchSize) / 7))
   readonly property int swatchRows: Math.ceil((root.swatches.length + 1) / 8)
-  // Body chips wrap five to a row, like the other traits.
-  readonly property int bodyRows: Math.ceil(root.optionsOf("body").length / 5)
+  // Trait chips wrap five to a row; the height of one trait's chips.
+  function chipsHeight(key) {
+    var rows = Math.ceil(root.optionsOf(key).length / 5)
+    return rows * root.chip5 + (rows - 1) * root.gap
+  }
 
-  // Every page but Saved (and Color with the picker open) fits this height,
-  // so switching tabs never moves the footer.
+  // Shape, Extras and Color (picker closed) fit this height, so switching
+  // between them never moves the footer. Face (eyes and mouth with nine
+  // options and a size each, then the personality) and Saved run taller
+  // rather than leave the other pages mostly empty.
   readonly property real fixedPageHeight: {
-    var shape = root.headH + root.headGap + root.bodyRows * root.chip5 + (root.bodyRows - 1) * root.gap + root.sectionGap + root.headH + root.headGap + root.buttonH
+    var shape = root.headH + root.headGap + root.chipsHeight("body") + root.sectionGap + root.headH + root.headGap + root.buttonH
       + root.sectionGap + 2 * root.buttonH + root.headGap
-    var face = 2 * (root.headH + root.headGap + root.chip5 + root.sectionGap) + root.rowH + root.sectionGap
-      + root.headH + root.headGap + root.buttonH + root.headGap + root.buttonH
     var extras = root.headH + root.headGap + root.chip5 + root.sectionGap + root.headH + root.headGap + root.chip6
     var color = root.headH + root.headGap + root.swatchRows * root.swatchSize + (root.swatchRows - 1) * Style.space(8)
-    return Math.ceil(Math.max(shape, face, extras, color))
+    return Math.ceil(Math.max(shape, extras, color))
   }
   readonly property real pageHeight: {
     var item = pageLoaders.itemAt(root.tab)
@@ -1018,8 +1055,18 @@ Item {
     id: facePage
     Column {
       spacing: root.sectionGap
-      TraitSection { key: "eyes" }
-      TraitSection { key: "mouth" }
+      Column {
+        width: parent.width
+        spacing: root.headGap
+        TraitSection { key: "eyes" }
+        SizeRow { key: "eyeSize"; label: strings.t("pet.size.eyes", "Eye size") }
+      }
+      Column {
+        width: parent.width
+        spacing: root.headGap
+        TraitSection { key: "mouth" }
+        SizeRow { key: "mouthSize"; label: strings.t("pet.size.mouth", "Mouth size") }
+      }
 
       CursorSurface {
         id: cheeksRow
@@ -1375,11 +1422,15 @@ Item {
     }
   }
 
-  // A label and S / M / L for one of the pet's sizes (key: barSize | panelSize).
+  // A label and a row of sizes: S / M / L for the pet in the bar or the panel
+  // (key: barSize | panelSize), or XS to XL for the eyes and the mouth (key:
+  // eyeSize | mouthSize, part of the look, so hovering one tries it on).
   component SizeRow: Item {
     id: sizeRow
     property string key: ""
     property string label: ""
+    readonly property bool scale: root.lookScales.indexOf(key) >= 0
+    readonly property bool trying: !!root.tryOn && root.tryOn.key === sizeRow.key
     width: parent ? parent.width : 100
     height: root.buttonH
 
@@ -1391,7 +1442,7 @@ Item {
       elide: Text.ElideRight
       textFormat: Text.PlainText
       text: sizeRow.label
-      color: root.foreground
+      color: sizeRow.trying ? root.accent : root.foreground
       font.family: root.fontFamily
       font.pixelSize: Style.font.bodySmall
     }
@@ -1404,15 +1455,18 @@ Item {
       fontSize: Style.font.bodySmall
       fontFamily: root.fontFamily
       foreground: root.foreground
-      value: root[sizeRow.key]
-      options: [
-        { value: "s", label: "S", tooltip: strings.t("pet.size.s", "Small") },
-        { value: "m", label: "M", tooltip: strings.t("pet.size.m", "Medium") },
-        { value: "l", label: "L", tooltip: strings.t("pet.size.l", "Large") }
-      ]
+      value: sizeRow.scale ? String(root.scaleStep(root.value(sizeRow.key))) : root[sizeRow.key]
+      options: sizeRow.scale ? root.scaleOptions : root.sizeOptions
       cursorIndex: root.keyTarget && root.keyTarget.kind === "pet." + sizeRow.key ? root.keyTarget.index : -1
-      onChanged: function(v) { root.editSize(sizeRow.key, v) }
-      onHovered: function(i, h) { if (h) root.pointRequested("pet." + sizeRow.key, i) }
+      onChanged: function(v) {
+        if (sizeRow.scale) root.commit(sizeRow.key, Number(v))
+        else root.editSize(sizeRow.key, v)
+      }
+      onHovered: function(i, h) {
+        if (!sizeRow.scale) { if (h) root.pointRequested("pet." + sizeRow.key, i) }
+        else if (h) root.hoverOption("pet." + sizeRow.key, i, sizeRow.key, root.scaleSteps[i])
+        else root.leaveOption()
+      }
     }
   }
 

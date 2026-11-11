@@ -4,6 +4,16 @@
 
 ### Pet Studio
 
+- Four new eyes: **Star**, **Sparkly** (big anime eyes with glints), **Cyclops** (one big
+  eyeball whose pupil follows the cursor) and **Heart** (beats softly). Four new mouths:
+  **Fang**, **Tongue**, **Grin** and **Smirk**. Every reaction reads with them; the cyclops
+  gets a single brow (it arches when worried, tilts when curious), one squeezed `><` eye,
+  one spiral, a wink that shuts its eye, and glasses become one round lens.
+- **Eye size** and **mouth size** (XS to XL) in the **Face** tab, saved with the look
+  (saved pets, codes, backups, PNG, undo and reset; shuffle stays near the middle).
+  Eyes and brows stay inside every body at the largest size, and a big mouth or a yawn
+  shrinks or moves up instead of hanging off the bean's dent. Looks without them keep the
+  usual size. The Face tab is now taller than the others, which stay compact.
 - Four new bodies: **Cloud** (puffs that swell in turn), **Egg**, **Mochi** (a soft dome
   that jiggles) and **Bean** (a kidney bean resting on its ends). Each one squashes and
   breathes, comes in solid and outline, and wears every head extra, accessory and seasonal
