@@ -25,6 +25,9 @@ dev/run.sh preview   # a window to play with the pet and its settings
 dev/run.sh face      # docs/pet.png    (the user's current pet, read-only)
 dev/run.sh sheet     # docs/sheet.png  (bodies, eyes, head, accessories, moods, reactions)
 dev/run.sh chips     # docs/chips.png  (every editor chip, framed, also in outline / pale)
+dev/run.sh fit       # docs/fit.png    (every head extra and accessory on every body,
+                     # both styles, panel and bar size, with the seasonal hats; a
+                     # large local check image, git-ignored)
 dev/run.sh editor    # docs/editor-<tab>.png for shape face extras color saved, and
                      # docs/editor.png (the face tab); `dev/run.sh editor color` for one
 dev/run.sh png       # Save PNG, backup / restore and editor key checks, in a temp folder

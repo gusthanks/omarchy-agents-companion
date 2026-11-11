@@ -2,3 +2,5 @@
 *.log
 .DS_Store
 dev/out/
+# dev/run.sh fit: a large local check image, not part of the docs
+docs/fit.png

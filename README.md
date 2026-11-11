@@ -80,8 +80,8 @@ bottom:
   fidgets), Calm (reacts to you, no idle fidgets) or Still (poses only, no animated
   reactions); a **Try** row plays Wink, Startle, Dizzy, Yawn and Party (celebrate) on the
   stage
-- **Extras**: head (antenna, leaf, ears, horns) and accessory (glasses, top hat, beanie,
-  bow, flower)
+- **Extras**: head (antenna, leaf, cat ears, horns, halo, tuft, bunny ears, unicorn horn)
+  and accessory (glasses, top hat, beanie, bow, flower, headphones, crown, scarf, bow tie)
 - **Color**: your current theme's colors (they follow theme switches), or any color from
   the custom picker / a hex code
 - **Saved**: keep the pets you make (up to 24) and wear them again in one click; copy /

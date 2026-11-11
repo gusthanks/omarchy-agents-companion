@@ -5,6 +5,9 @@
 #
 #   dev/run.sh preview          play with the pet + settings in a window
 #   dev/run.sh face|sheet|chips render docs/pet.png | docs/sheet.png | docs/chips.png
+#   dev/run.sh fit              docs/fit.png: every head extra and accessory on
+#                               every body, both styles, panel and bar size
+#                               (a local check image, git-ignored)
 #   dev/run.sh editor [TAB]     render docs/editor-<tab>.png for each settings tab
 #                               (shape face extras color saved), or just TAB;
 #                               docs/editor.png is the face tab
@@ -76,6 +79,7 @@ case "${1:-preview}" in
   face)    render face "$repo/docs/pet.png" && echo docs/pet.png ;;
   sheet)   render sheet "$repo/docs/sheet.png" && echo docs/sheet.png ;;
   chips)   render chips "$repo/docs/chips.png" && echo docs/chips.png ;;
+  fit)     render fit "$repo/docs/fit.png" && echo docs/fit.png ;;
   editor)  editor "${2:-${TAB:-}}" ;;
   png)     out="$cfg/out"; mkdir -p "$out"; render png "$out"; ls -la "$out"; echo "(files in $out)" ;;
   gif)     gif ;;
@@ -92,6 +96,6 @@ case "${1:-preview}" in
     if grep -q 'Failed to load configuration' "$cfg/check.log"; then grep -E 'ERROR' "$cfg/check.log" >&2; exit 1; fi
     grep -a 'CHECK ' "$cfg/check.log" | sed 's/^.*CHECK /CHECK /'
     ! grep -a 'CHECK ' "$cfg/check.log" | grep -vq ' OK$' ;;
-  docs)    "$0" face; "$0" sheet; "$0" chips; "$0" editor; "$0" gif ;;
-  *) sed -n '2,20p' "$0"; exit 1 ;;
+  docs)    "$0" face; "$0" sheet; "$0" chips; "$0" fit; "$0" editor; "$0" gif ;;
+  *) sed -n '2,23p' "$0"; exit 1 ;;
 esac

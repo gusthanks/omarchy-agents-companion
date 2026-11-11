@@ -4,6 +4,15 @@
 
 ### Pet Studio
 
+- Four new head extras: **Halo** (floats and bobs over the head), **Tuft**, **Bunny ears**
+  and a **Unicorn horn**; "Ears" is now called **Cat ears**. Four new accessories:
+  **Headphones**, **Crown**, **Scarf** and **Bow tie**. All of them fit every body, in
+  solid and outline, in the bar and the panel, and follow the squash and breathing.
+  The crown counts as a hat (the seasonal hat replaces it for the day), and any hat hides
+  the extras that grow from the top of the head (antenna, leaf, tuft, horn, halo); ears
+  and horns stay. Headphones go over the head and under a seasonal hat; scarf and bow tie
+  sit low on the body with anything on top, and big mouths move up to stay clear of them.
+  The Extras tab wraps both kinds of chips five to a row.
 - Four new eyes: **Star**, **Sparkly** (big anime eyes with glints), **Cyclops** (one big
   eyeball whose pupil follows the cursor) and **Heart** (beats softly). Four new mouths:
   **Fang**, **Tongue**, **Grin** and **Smirk**. Every reaction reads with them; the cyclops

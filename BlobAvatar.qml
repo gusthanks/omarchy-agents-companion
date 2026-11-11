@@ -35,7 +35,7 @@ Item {
   // Hearts and confetti (off in the bar, which is one icon tall).
   property bool particles: true
   // Editor chips: a still, zoomed crop of one part of the pet. "" draws the
-  // whole live pet; silhouette | eyes | mouth | top | topLeft | topRight.
+  // whole live pet; silhouette | eyes | mouth | top | topLeft | topRight | neck.
   property string framing: ""
   readonly property bool still: root.framing !== ""
 
@@ -84,17 +84,25 @@ Item {
   readonly property color trimColor: root.foreground
 
   property int dayStamp: 0 // bumped hourly so the seasonal hat follows the date
+  // The day to dress for; null is today (the dev harness picks a holiday).
+  property var day: null
   readonly property string seasonHat: {
     if (!root.seasonal) return ""
     var stamp = root.dayStamp
-    var d = new Date()
+    var d = root.day || new Date()
     var m = d.getMonth() + 1, day = d.getDate()
     if (m === 12 && (day === 24 || day === 25)) return "santa"
     if ((m === 12 && day === 31) || (m === 1 && day === 1)) return "party"
     return ""
   }
+  // What sits on top of the head: the seasonal hat replaces the look's own
+  // (top hat, beanie or crown) for the day, and either one hides the extras
+  // that grow from the crown of the head (antenna, leaf, tuft, unicorn horn,
+  // halo). Ears and horns stay: they come out on each side of a hat.
   readonly property string headwear: root.seasonHat !== "" ? root.seasonHat
-    : (root.accessory === "hat" || root.accessory === "beanie" ? root.accessory : "")
+    : (["hat", "beanie", "crown"].indexOf(root.accessory) >= 0 ? root.accessory : "")
+  // Scarf and bow tie: worn at the bottom of the body, with anything on top.
+  readonly property bool neckwear: root.accessory === "scarf" || root.accessory === "bowtie"
   Timer { interval: 3600000; repeat: true; running: root.seasonal; onTriggered: root.dayStamp++ }
 
   // ------------------------------------------------------------ live state
@@ -647,16 +655,19 @@ Item {
   // is, how far apart side pieces (ears, horns, bow, flower) go, and how big
   // hats are, so a narrow egg top or a puffy cloud still wears them well.
   // chin: the lowest a mouth may reach in the middle (the bean's dent, the
-  // ghost's waves), so big mouths and yawns stay on the body.
+  // ghost's waves), so big mouths and yawns stay on the body. crest: the
+  // body's real top, which the headphones band clears; side: its half width
+  // at ear height, where the ear cups go; neck: where a scarf or bow tie
+  // starts, low on the body but under the mouth (it also raises the chin).
   readonly property var headFit: ({
-    drop: { top: 1.05, spread: 1, hat: 1, chin: 0.8 },
-    ghost: { top: 0.92, spread: 1, hat: 1, chin: 0.62 },
-    cloud: { top: 0.84, spread: 1, hat: 0.9, chin: 0.72 },
-    egg: { top: 1.0, spread: 0.72, hat: 0.82, chin: 0.8 },
-    mochi: { top: 0.75, spread: 1.04, hat: 1, chin: 0.78 },
-    bean: { top: 0.74, spread: 1, hat: 1, chin: 0.47 }
+    drop: { top: 1.05, spread: 1, hat: 1, chin: 0.8, crest: 1.12, side: 0.88, neck: 0.5 },
+    ghost: { top: 0.92, spread: 1, hat: 1, chin: 0.62, crest: 1.1, side: 1, neck: 0.44 },
+    cloud: { top: 0.84, spread: 1, hat: 0.9, chin: 0.72, crest: 0.86, side: 0.85, neck: 0.42 },
+    egg: { top: 1.0, spread: 0.72, hat: 0.82, chin: 0.8, crest: 1.02, side: 0.82, neck: 0.46 },
+    mochi: { top: 0.75, spread: 1.04, hat: 1, chin: 0.78, crest: 0.75, side: 0.97, neck: 0.44 },
+    bean: { top: 0.74, spread: 1, hat: 1, chin: 0.47, crest: 0.73, side: 1.04, neck: 0.38 }
   })
-  readonly property var head: root.headFit[root.bodyShape] || { top: 0.92, spread: 1, hat: 1, chin: 0.8 }
+  readonly property var head: root.headFit[root.bodyShape] || { top: 0.92, spread: 1, hat: 1, chin: 0.8, crest: 1, side: 1, neck: 0.44 }
 
   function headTop(cy, r, sy) {
     return cy - r * sy * root.head.top
@@ -665,13 +676,16 @@ Item {
   function paintExtra(ctx, cx, cy, r, sx, sy, fill) {
     var e = root.extraStyle
     if (e === "none") return
+    // The ones growing from the crown of the head hide under a hat.
+    if (root.headwear !== "" && ["antenna", "leaf", "tuft", "unicorn", "halo"].indexOf(e) >= 0) return
     var topY = headTop(cy, r, sy)
+    var trim = root.rgba(root.trimColor, 1)
     ctx.fillStyle = fill
     ctx.strokeStyle = fill
     ctx.lineCap = "round"
+    ctx.lineJoin = "round"
     ctx.lineWidth = r * 0.1
     if (e === "antenna") {
-      if (root.headwear !== "") return // hidden under a hat
       var sway = Math.sin(root.phase * 2) * r * 0.12
       ctx.beginPath()
       ctx.moveTo(cx, topY + r * 0.2)
@@ -681,7 +695,6 @@ Item {
       ctx.arc(cx + sway, topY - r * 0.48, r * 0.13, 0, Math.PI * 2)
       ctx.fill()
     } else if (e === "leaf") {
-      if (root.headwear !== "") return
       ctx.beginPath()
       ctx.moveTo(cx, topY + r * 0.15)
       ctx.lineTo(cx, topY - r * 0.22)
@@ -711,7 +724,89 @@ Item {
         ctx.closePath()
         ctx.fill()
       }
+    } else if (e === "bunnyEars") {
+      // Two long ears splaying out a little, the right one's tip leaning
+      // out, with a lighter inside (the base hides behind the body).
+      var inner = root.solid ? root.rgba(root.background, 0.28) : root.rgba(root.background, 0.4)
+      var flop = Math.sin(root.phase * 2) * 0.04
+      for (var b = -1; b <= 1; b += 2) {
+        ctx.save()
+        ctx.translate(cx + b * r * 0.3 * root.head.spread * sx, topY + r * 0.16)
+        ctx.rotate(b * (0.2 + flop))
+        bunnyEar(ctx, r, b > 0)
+        ctx.fillStyle = fill
+        ctx.fill()
+        ctx.save()
+        ctx.translate(0, -r * 0.04)
+        ctx.scale(0.5, 0.82)
+        bunnyEar(ctx, r, b > 0)
+        ctx.restore()
+        ctx.fillStyle = inner
+        ctx.fill()
+        ctx.restore()
+      }
+    } else if (e === "tuft") {
+      // Three strands of hair curling to one side, swaying a little. They
+      // grow from the body's real top, so an outline pet shows no roots.
+      var crest = cy - r * root.head.crest * sy
+      var lean = Math.sin(root.phase * 2) * 0.05
+      var strands = [[-0.13, 0.26, -0.5], [0, 0.42, 0.25], [0.13, 0.3, 0.75]]
+      for (var t = 0; t < strands.length; t++) {
+        var st = strands[t]
+        ctx.save()
+        ctx.translate(cx + st[0] * r, crest + r * 0.08)
+        ctx.rotate(st[2] * 0.5 + lean)
+        ctx.beginPath()
+        ctx.moveTo(-r * 0.11, 0)
+        ctx.quadraticCurveTo(-r * 0.1, -r * (0.16 + st[1] * 0.7), r * 0.14, -r * (0.16 + st[1]))
+        ctx.quadraticCurveTo(r * 0.04, -r * (0.1 + st[1] * 0.5), r * 0.11, 0)
+        ctx.closePath()
+        ctx.fill()
+        ctx.restore()
+      }
+    } else if (e === "unicorn") {
+      // A spiral horn, in the trim color so it reads apart from the body.
+      ctx.save()
+      ctx.translate(cx + r * 0.04, cy - r * (root.head.crest - 0.1) * sy)
+      ctx.rotate(0.14)
+      var hw = r * 0.16, hl = r * 0.78
+      ctx.fillStyle = trim
+      ctx.beginPath()
+      ctx.moveTo(-hw, 0)
+      ctx.quadraticCurveTo(-hw * 0.5, -hl * 0.6, 0, -hl)
+      ctx.quadraticCurveTo(hw * 0.5, -hl * 0.6, hw, 0)
+      ctx.closePath()
+      ctx.fill()
+      ctx.clip()
+      ctx.strokeStyle = root.rgba(root.baseColor, 0.75)
+      ctx.lineWidth = r * 0.045
+      ctx.beginPath()
+      for (var g = 1; g <= 3; g++) {
+        var gy = -hl * (0.04 + 0.2 * g)
+        ctx.moveTo(-hw, gy + r * 0.04)
+        ctx.lineTo(hw, gy - r * 0.05)
+      }
+      ctx.stroke()
+      ctx.restore()
+    } else if (e === "halo") {
+      // A ring floating over the head, bobbing gently.
+      var hy = topY - r * (0.34 + 0.03 * Math.sin(root.phase * 2))
+      ctx.strokeStyle = trim
+      ctx.lineWidth = r * 0.08
+      ctx.beginPath()
+      ctx.ellipse(cx - r * 0.36, hy - r * 0.1, r * 0.72, r * 0.2)
+      ctx.stroke()
     }
+  }
+
+  // One bunny ear standing on its base at (0, 0); bent leans its tip out.
+  function bunnyEar(ctx, r, bent) {
+    var w = r * 0.15, h = r * 0.82
+    ctx.beginPath()
+    ctx.moveTo(-w * 0.7, 0)
+    ctx.bezierCurveTo(-w * 1.15, -h * 0.45, -w * 0.9, -h, bent ? w * 0.2 : 0, -h)
+    ctx.bezierCurveTo(bent ? w * 1.4 : w * 0.9, -h, w * 1.15, -h * 0.45, w * 0.7, 0)
+    ctx.closePath()
   }
 
   function roundRect(ctx, x, y, w, h, rad) {
@@ -1115,10 +1210,15 @@ Item {
     ctx.restore()
   }
 
-  // Glasses, bow and flower sit on the face; hats are drawn by paintHeadwear.
+  // Glasses, bow, flower, headphones and neckwear; hats and the crown are
+  // drawn by paintHeadwear (over the headphones band, so a seasonal hat sits
+  // on top of it).
   function paintAccessory(ctx, cx, cy, r, sx, sy, eyes) {
     var a = root.accessory
     var ink = root.rgba(root.featureColor, 1)
+    if (a === "headphones") paintHeadphones(ctx, cx, cy, r, sx, sy)
+    else if (a === "scarf") paintScarf(ctx, cx, cy, r, sx, sy)
+    else if (a === "bowtie") paintBowtie(ctx, cx, cy, r, sx, sy)
     if (a === "glasses" && root.oneEye) {
       // One round lens around the cyclops's eye, with short side arms.
       ctx.strokeStyle = ink
@@ -1179,6 +1279,132 @@ Item {
     }
   }
 
+  // A band over the head (clearing its real top) and a cup on each side at
+  // ear height, where the body is widest; ears and horns poke out past it.
+  function paintHeadphones(ctx, cx, cy, r, sx, sy) {
+    var hf = root.head
+    var trim = root.rgba(root.trimColor, 1)
+    var cupY = cy - r * 0.12 * sy
+    var cupW = r * 0.24, cupH = r * 0.44 * sy
+    var reach = r * hf.side * sx
+    var baseY = cupY - cupH * 0.25
+    var rise = baseY - (cy - r * (hf.crest + 0.1) * sy)
+    ctx.strokeStyle = trim
+    ctx.lineCap = "round"
+    ctx.lineWidth = r * 0.09
+    ctx.beginPath()
+    for (var i = 0; i <= 32; i++) {
+      var a = Math.PI + Math.PI * i / 32
+      var x = cx + (reach - r * 0.03) * Math.cos(a), y = baseY + rise * Math.sin(a)
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
+    }
+    ctx.stroke()
+    ctx.fillStyle = trim
+    for (var s = -1; s <= 1; s += 2) {
+      roundRect(ctx, cx + s * reach - cupW / 2, cupY - cupH / 2, cupW, cupH, cupW / 2)
+      ctx.fill()
+    }
+    // The pads' inner edge, in the body color.
+    ctx.fillStyle = root.rgba(root.baseColor, 0.85)
+    for (var p = -1; p <= 1; p += 2) {
+      ctx.beginPath()
+      ctx.ellipse(cx + p * (reach + cupW * 0.08) - r * 0.04, cupY - cupH * 0.28, r * 0.08, cupH * 0.56)
+      ctx.fill()
+    }
+  }
+
+  // Neckwear sits low on the body, under the mouth (paintPet raises the chin
+  // to keep big mouths off it).
+  function neckY(cy, r, sy) { return cy + r * root.head.neck * sy }
+
+  // A band wrapped around the lower body (clipped to it, so it follows every
+  // silhouette), knotted on one side with two ends hanging over the edge.
+  function paintScarf(ctx, cx, cy, r, sx, sy) {
+    var trim = root.rgba(root.trimColor, 1)
+    var seam = root.rgba(root.background, 0.22)
+    var top = neckY(cy, r, sy)
+    var th = r * 0.26 * sy, sag = r * 0.1 * sy, wide = r * 1.3 * sx
+    ctx.save()
+    bodyPath(ctx, cx, cy, r, sx, sy)
+    ctx.clip()
+    ctx.beginPath()
+    ctx.moveTo(cx - wide, top - sag * 0.4)
+    ctx.quadraticCurveTo(cx, top + sag, cx + wide, top - sag * 0.4)
+    ctx.lineTo(cx + wide, top + th - sag * 0.4)
+    ctx.quadraticCurveTo(cx, top + th + sag, cx - wide, top + th - sag * 0.4)
+    ctx.closePath()
+    ctx.fillStyle = trim
+    ctx.fill()
+    ctx.restore()
+
+    // The two ends flare out from a knot on one side, swinging a little
+    // with the wobble; a stripe of the body color near each fringe.
+    var kx = cx + r * 0.42 * sx, ky = top + th * 0.5 + sag * 0.2
+    var swing = Math.sin(root.phase * 2) * 0.05
+    var ends = [[-0.38, 0.5], [0.06, 0.6]] // angle, length
+    ctx.lineJoin = "round"
+    for (var i = 0; i < ends.length; i++) {
+      ctx.save()
+      ctx.translate(kx, ky)
+      ctx.rotate(ends[i][0] + swing)
+      var len = r * ends[i][1] * sy
+      ctx.beginPath()
+      ctx.moveTo(-r * 0.12, 0)
+      ctx.lineTo(-r * 0.16, len)
+      ctx.lineTo(r * 0.16, len)
+      ctx.lineTo(r * 0.12, 0)
+      ctx.closePath()
+      ctx.fillStyle = trim
+      ctx.fill()
+      ctx.strokeStyle = seam
+      ctx.lineWidth = r * 0.03
+      ctx.stroke()
+      ctx.fillStyle = root.rgba(root.baseColor, 0.7)
+      ctx.fillRect(-r * 0.155, len - r * 0.17, r * 0.31, r * 0.07)
+      ctx.beginPath()
+      for (var f = -1; f <= 1; f++) {
+        ctx.moveTo(f * r * 0.1, len)
+        ctx.lineTo(f * r * 0.1, len + r * 0.07)
+      }
+      ctx.strokeStyle = trim
+      ctx.lineWidth = r * 0.04
+      ctx.stroke()
+      ctx.restore()
+    }
+    ctx.fillStyle = trim
+    ctx.strokeStyle = seam
+    ctx.lineWidth = r * 0.03
+    ctx.beginPath()
+    ctx.ellipse(kx - r * 0.17, ky - r * 0.15, r * 0.34, r * 0.3)
+    ctx.fill()
+    ctx.stroke()
+  }
+
+  // A bow tie in the middle, just under where the scarf would start.
+  function paintBowtie(ctx, cx, cy, r, sx, sy) {
+    var trim = root.rgba(root.trimColor, 1)
+    var bx = cx, by = neckY(cy, r, sy) + r * 0.16 * sy
+    var bw = r * 0.38 * sx, bh = r * 0.2 * sy
+    ctx.fillStyle = trim
+    ctx.strokeStyle = trim
+    ctx.lineJoin = "round"
+    ctx.lineWidth = r * 0.06
+    for (var w = -1; w <= 1; w += 2) {
+      ctx.beginPath()
+      ctx.moveTo(bx, by)
+      ctx.lineTo(bx + w * bw, by - bh)
+      ctx.quadraticCurveTo(bx + w * bw * 1.12, by, bx + w * bw, by + bh)
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+    }
+    roundRect(ctx, bx - r * 0.1, by - r * 0.11 * sy, r * 0.2, r * 0.22 * sy, r * 0.06)
+    ctx.fill()
+    ctx.strokeStyle = root.rgba(root.background, 0.35)
+    ctx.lineWidth = r * 0.03
+    ctx.stroke()
+  }
+
   function paintHeadwear(ctx, cx, cy, r, sx, sy) {
     var h = root.headwear
     if (h === "") return
@@ -1211,6 +1437,30 @@ Item {
       ctx.beginPath()
       ctx.ellipse(cx - r * 0.12, top - r * 0.56, r * 0.24, r * 0.24)
       ctx.fill()
+    } else if (h === "crown") {
+      // Three points with a ball on each, and gems in the body color.
+      ctx.fillStyle = ink
+      ctx.strokeStyle = ink
+      ctx.lineJoin = "round"
+      ctx.lineWidth = r * 0.06
+      ctx.beginPath()
+      ctx.moveTo(cx - r * 0.42, top + r * 0.18)
+      ctx.lineTo(cx - r * 0.48, top - r * 0.3)
+      ctx.lineTo(cx - r * 0.22, top - r * 0.06)
+      ctx.lineTo(cx, top - r * 0.4)
+      ctx.lineTo(cx + r * 0.22, top - r * 0.06)
+      ctx.lineTo(cx + r * 0.48, top - r * 0.3)
+      ctx.lineTo(cx + r * 0.42, top + r * 0.18)
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+      disc(ctx, cx - r * 0.48, top - r * 0.32, r * 0.08)
+      disc(ctx, cx, top - r * 0.42, r * 0.08)
+      disc(ctx, cx + r * 0.48, top - r * 0.32, r * 0.08)
+      ctx.fillStyle = root.rgba(root.baseColor, 0.9)
+      disc(ctx, cx - r * 0.24, top + r * 0.07, r * 0.055)
+      disc(ctx, cx, top + r * 0.06, r * 0.07)
+      disc(ctx, cx + r * 0.24, top + r * 0.07, r * 0.055)
     } else if (h === "santa") {
       ctx.fillStyle = "#d94450"
       ctx.beginPath()
@@ -1305,6 +1555,7 @@ Item {
     // Face chips show the whole body (no crop); the chip look already drops
     // accessories and head extras so the eyes and mouth read clearly.
     if (framing === "eyes" || framing === "mouth") return { x: cx, y: cy, z: 1.0 }
+    if (framing === "neck") return { x: cx, y: cy + 0.3 * r, z: 1.05 }
     if (framing === "top") return { x: cx, y: headTop(cy, r, 1) + 0.12 * r, z: 1.35 }
     if (framing === "topRight") return { x: cx + 0.42 * r, y: cy - 0.62 * r, z: 1.7 }
     if (framing === "topLeft") return { x: cx - 0.42 * r, y: cy - 0.62 * r, z: 1.7 }
@@ -1319,7 +1570,7 @@ Item {
     var still = root.still
     // Leave headroom for anything that grows above the head. Chips always
     // use the tall frame, so every chip in a row has the same size.
-    var tall = still || root.extraStyle !== "none" || root.headwear !== "" || root.accessory === "bow" || root.accessory === "flower"
+    var tall = still || root.extraStyle !== "none" || root.headwear !== "" || ["bow", "flower", "headphones"].indexOf(root.accessory) >= 0
     var f = root.face
     var cy = S / 2 + (tall ? S * 0.07 : 0) + (still ? 0 : root.hop * 2 + f.hop * S)
     if (tall) r = S * 0.34
@@ -1385,7 +1636,8 @@ Item {
       }
     }
 
-    paintMouth(ctx, cx, r, eyes, cy + r * sy * root.head.chin)
+    var chin = root.neckwear ? Math.min(root.head.chin, root.head.neck - 0.03) : root.head.chin
+    paintMouth(ctx, cx, r, eyes, cy + r * sy * chin)
     paintAccessory(ctx, cx, cy, r, sx, sy, eyes)
     paintHeadwear(ctx, cx, cy, r, sx, sy)
     if (moved) ctx.restore()

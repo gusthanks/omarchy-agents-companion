@@ -13,6 +13,7 @@ import "pet" as Pet
 //   preview  interactive floating window to play with the pet and its settings
 //   face     the user's current pet, large      -> $OUT (png)
 //   sheet    grid of bodies, eyes, accessories, moods, reactions -> $OUT (png)
+//   fit      every head extra and accessory on every body -> $OUT (png)
 //   editor   the pet settings panel             -> $OUT (png)
 //   gif      scripted demo, one png per frame   -> $OUT/0000.png ... + $OUT/fps
 ShellRoot {
@@ -69,6 +70,7 @@ ShellRoot {
         id: loader
         sourceComponent: shell.mode === "face" ? faceScene
           : shell.mode === "sheet" ? sheetScene
+          : shell.mode === "fit" ? fitScene
           : shell.mode === "chips" ? chipsScene
           : shell.mode === "editor" ? editorScene
           : shell.mode === "png" ? pngScene
@@ -143,7 +145,9 @@ ShellRoot {
         { label: "mouth", key: "mouth", options: ["none", "smile", "o", "cat", "flat"] },
         { label: "", key: "mouth", options: ["fang", "tongue", "grin", "smirk"] },
         { label: "head", key: "extra", options: ["none", "antenna", "leaf", "ears", "horns"] },
-        { label: "accessory", key: "accessory", options: ["glasses", "hat", "beanie", "bow", "flower"] }
+        { label: "", key: "extra", options: ["halo", "tuft", "bunnyEars", "unicorn"] },
+        { label: "accessory", key: "accessory", options: ["glasses", "hat", "beanie", "bow", "flower"] },
+        { label: "", key: "accessory", options: ["headphones", "crown", "scarf", "bowtie"] }
       ]
       function lookWith(set) {
         var l = {}
@@ -238,6 +242,101 @@ ShellRoot {
     }
   }
 
+  // Every head extra and accessory on all bodies: panel size in the pet's
+  // style and in the other one, then bar size (still, as in the bar) in both.
+  // The last rows put the seasonal hats over what they must not collide with.
+  Component {
+    id: fitScene
+    Column {
+      id: fit
+      padding: 18
+      spacing: 6
+      readonly property var bodies: ["blob", "orb", "squircle", "drop", "ghost", "cloud", "egg", "mochi", "bean"]
+      readonly property string style: shell.petLook.style === "outline" ? "outline" : "solid"
+      readonly property string other: fit.style === "outline" ? "solid" : "outline"
+      readonly property var rows: {
+        var out = [], k
+        var extras = ["antenna", "leaf", "ears", "horns", "halo", "tuft", "bunnyEars", "unicorn"]
+        var accs = ["glasses", "hat", "beanie", "bow", "flower", "headphones", "crown", "scarf", "bowtie"]
+        for (k = 0; k < extras.length; k++) out.push({ label: extras[k], set: { extra: extras[k], accessory: "none" } })
+        for (k = 0; k < accs.length; k++) out.push({ label: accs[k], set: { extra: "none", accessory: accs[k] } })
+        out.push({ label: "mix", set: { extra: "bunnyEars", accessory: "headphones", mouth: "grin", mouthSize: 1.4 } })
+        out.push({ label: "mix", set: { extra: "unicorn", accessory: "scarf", mouth: "fang", mouthSize: 1.4 } })
+        // Squashed (a sneeze) and stretched (waking up): everything follows.
+        out.push({ label: "sneeze", pose: "sneeze", set: { extra: "unicorn", accessory: "headphones" } })
+        out.push({ label: "wake", pose: "wake", set: { extra: "halo", accessory: "scarf" } })
+        out.push({ label: "wake", pose: "wake", set: { extra: "tuft", accessory: "bowtie" } })
+        out.push({ label: "santa", day: new Date(2026, 11, 25), set: { extra: "halo", accessory: "headphones" } })
+        out.push({ label: "santa", day: new Date(2026, 11, 25), set: { extra: "ears", accessory: "scarf" } })
+        out.push({ label: "party", day: new Date(2026, 11, 31), set: { extra: "tuft", accessory: "crown" } })
+        out.push({ label: "party", day: new Date(2026, 11, 31), set: { extra: "horns", accessory: "bowtie" } })
+        return out
+      }
+      function lookFor(row, body, style) {
+        var l = {}, k
+        for (k in shell.petLook) l[k] = shell.petLook[k]
+        for (k in row.set) l[k] = row.set[k]
+        l.body = body
+        l.style = style
+        return l
+      }
+      Repeater {
+        model: fit.rows
+        Row {
+          id: fitRow
+          required property var modelData
+          spacing: 4
+          Text { width: 74; anchors.verticalCenter: parent.verticalCenter; text: fitRow.modelData.label; color: shell.dim; font.family: Commons.Style.font.family; font.pixelSize: 12 }
+          Repeater {
+            model: [fit.style, fit.other]
+            Row {
+              id: half
+              required property string modelData
+              spacing: 2
+              Repeater {
+                model: fit.bodies
+                Pet.BlobAvatar {
+                  required property string modelData
+                  size: 48
+                  look: fit.lookFor(fitRow.modelData, modelData, half.modelData)
+                  themePalette: themeColors
+                  interactive: false; animated: false; lively: false; showMarks: false
+                  seasonal: !!fitRow.modelData.day
+                  day: fitRow.modelData.day || null
+                  posePreview: fitRow.modelData.pose || ""
+                }
+              }
+              Item { width: 10; height: 1 }
+            }
+          }
+          Repeater {
+            model: [fit.style, fit.other]
+            Row {
+              id: bar
+              required property string modelData
+              spacing: 2
+              anchors.verticalCenter: parent.verticalCenter
+              Repeater {
+                model: fit.bodies
+                Pet.BlobAvatar {
+                  required property string modelData
+                  size: 22
+                  look: fit.lookFor(fitRow.modelData, modelData, bar.modelData)
+                  themePalette: themeColors
+                  interactive: false; animated: false; lively: false; showMarks: false
+                  seasonal: !!fitRow.modelData.day
+                  day: fitRow.modelData.day || null
+                  posePreview: fitRow.modelData.pose || ""
+                }
+              }
+              Item { width: 8; height: 1 }
+            }
+          }
+        }
+      }
+    }
+  }
+
   // Mock saved pets for the editor captures (never written anywhere).
   readonly property var mockSaved: [
     { name: shell.petName, look: shell.petLook },
@@ -271,7 +370,7 @@ ShellRoot {
         themePalette: themeColors
         tab: parent.tabIndex
         Component.onCompleted: {
-          var cursor = [{ kind: "pet.body", index: 7 }, { kind: "pet.eyes", index: 7 }, { kind: "pet.accessory", index: 4 },
+          var cursor = [{ kind: "pet.body", index: 7 }, { kind: "pet.eyes", index: 7 }, { kind: "pet.accessory", index: 6 },
                         { kind: "pet.swatch", index: 5 }, { kind: "pet.card", index: 1 }][tab]
           keyTarget = cursor
           syncTryOn(cursor)

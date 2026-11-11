@@ -70,8 +70,8 @@ Item {
     { key: "body", options: ["blob", "orb", "squircle", "drop", "ghost", "cloud", "egg", "mochi", "bean"] },
     { key: "eyes", options: ["capsule", "dot", "googly", "pixel", "sleepy", "star", "sparkle", "cyclops", "heart"] },
     { key: "mouth", options: ["none", "smile", "o", "cat", "flat", "fang", "tongue", "grin", "smirk"] },
-    { key: "extra", options: ["none", "antenna", "leaf", "ears", "horns"] },
-    { key: "accessory", options: ["none", "glasses", "hat", "beanie", "bow", "flower"] },
+    { key: "extra", options: ["none", "antenna", "leaf", "ears", "horns", "halo", "tuft", "bunnyEars", "unicorn"] },
+    { key: "accessory", options: ["none", "glasses", "hat", "beanie", "bow", "flower", "headphones", "crown", "scarf", "bowtie"] },
     { key: "style", options: ["solid", "outline"] },
     { key: "cheeks", options: [true, false] }
   ]
@@ -84,8 +84,9 @@ Item {
     body: { blob: "Blob", orb: "Orb", squircle: "Squircle", drop: "Drop", ghost: "Ghost", cloud: "Cloud", egg: "Egg", mochi: "Mochi", bean: "Bean" },
     eyes: { capsule: "Capsule", dot: "Dots", googly: "Googly", pixel: "Pixel", sleepy: "Sleepy", star: "Star", sparkle: "Sparkly", cyclops: "Cyclops", heart: "Heart" },
     mouth: { none: "None", smile: "Smile", o: "Surprised", cat: "Cat", flat: "Flat", fang: "Fang", tongue: "Tongue", grin: "Grin", smirk: "Smirk" },
-    extra: { none: "None", antenna: "Antenna", leaf: "Leaf", ears: "Ears", horns: "Horns" },
-    accessory: { none: "None", glasses: "Glasses", hat: "Top hat", beanie: "Beanie", bow: "Bow", flower: "Flower" },
+    extra: { none: "None", antenna: "Antenna", leaf: "Leaf", ears: "Cat ears", horns: "Horns", halo: "Halo", tuft: "Tuft", bunnyEars: "Bunny ears", unicorn: "Unicorn horn" },
+    accessory: { none: "None", glasses: "Glasses", hat: "Top hat", beanie: "Beanie", bow: "Bow", flower: "Flower",
+                 headphones: "Headphones", crown: "Crown", scarf: "Scarf", bowtie: "Bow tie" },
     style: { solid: "Solid", outline: "Outline" }
   })
   // Eye and mouth size: numbers in the look, picked from five steps.
@@ -212,8 +213,13 @@ Item {
     if (key === "eyes") return "eyes"
     if (key === "mouth") return "mouth"
     // Bow and flower sit on the sides of the head: the "top" frame keeps
-    // them whole, so the accessory row reads as one family.
-    if (key === "accessory") return val === "glasses" ? "eyes" : "top"
+    // them whole, so the accessory row reads as one family. Glasses and
+    // headphones need the whole head, neckwear the whole body down to the
+    // scarf ends.
+    if (key === "accessory") {
+      if (val === "glasses" || val === "headphones") return "eyes"
+      return val === "scarf" || val === "bowtie" ? "neck" : "top"
+    }
     return "top"
   }
 
@@ -639,8 +645,8 @@ Item {
       rows.push(root.cells("pet.personality", 3))
       rows.push(root.cells("pet.react", root.previewReactions.length))
     } else if (root.tab === 2) {
-      rows.push(root.cells("pet.extra", 5))
-      rows.push(root.cells("pet.accessory", 6))
+      rows = rows.concat(root.chunks("pet.extra", root.optionsOf("extra").length, 5))
+      rows = rows.concat(root.chunks("pet.accessory", root.optionsOf("accessory").length, 5))
     } else if (root.tab === 3) {
       rows = rows.concat(root.chunks("pet.swatch", root.swatches.length + 1, 8))
       if (root.pickerOpen) rows.push([{ kind: "pet.hex", index: 0 }])
@@ -745,8 +751,6 @@ Item {
   // ------------------------------------------------------------ layout sizes
   readonly property real gap: Style.space(8)
   readonly property real chip5: Math.floor((root.width - 4 * root.gap) / 5)
-  readonly property real gap6: Style.space(6)
-  readonly property real chip6: Math.floor((root.width - 5 * root.gap6) / 6)
   readonly property real sectionGap: Style.space(10)
   readonly property real headGap: Style.space(6)
   readonly property real headH: headProbe.implicitHeight
@@ -768,7 +772,7 @@ Item {
   readonly property real fixedPageHeight: {
     var shape = root.headH + root.headGap + root.chipsHeight("body") + root.sectionGap + root.headH + root.headGap + root.buttonH
       + root.sectionGap + 2 * root.buttonH + root.headGap
-    var extras = root.headH + root.headGap + root.chip5 + root.sectionGap + root.headH + root.headGap + root.chip6
+    var extras = root.headH + root.headGap + root.chipsHeight("extra") + root.sectionGap + root.headH + root.headGap + root.chipsHeight("accessory")
     var color = root.headH + root.headGap + root.swatchRows * root.swatchSize + (root.swatchRows - 1) * Style.space(8)
     return Math.ceil(Math.max(shape, extras, color))
   }
@@ -1240,7 +1244,7 @@ Item {
     Column {
       spacing: root.sectionGap
       TraitSection { key: "extra" }
-      TraitSection { key: "accessory"; chipSize: root.chip6; chipGap: root.gap6 }
+      TraitSection { key: "accessory" }
     }
   }
 
@@ -1474,8 +1478,6 @@ Item {
   component TraitSection: Column {
     id: section
     property string key: ""
-    property real chipSize: root.chip5
-    property real chipGap: root.gap
     readonly property bool trying: !!root.tryOn && root.tryOn.key === section.key
     width: parent ? parent.width : 100
     spacing: root.headGap
@@ -1488,14 +1490,14 @@ Item {
     // Wraps when a trait has more options than fit in a row (body: 5 + 4).
     Flow {
       width: parent.width
-      spacing: section.chipGap
+      spacing: root.gap
       Repeater {
         model: root.optionsOf(section.key)
         PetChip {
           id: chip
           required property var modelData
           required property int index
-          size: section.chipSize
+          size: root.chip5
           look: root.chipLook(section.key, modelData)
           framing: root.chipFrame(section.key, modelData)
           isNone: modelData === "none"

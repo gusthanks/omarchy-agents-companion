@@ -85,8 +85,9 @@ Pronto no rodapé:
   as reações e pequenas manias), Calmo (reage a você, sem manias à toa) ou Quieto
   (só poses, sem reações animadas); uma linha **Testar** toca Piscar, Susto, Tontura,
   Bocejo e Festa no palco
-- **Extras**: cabeça (antena, folha, orelhas, chifres) e acessório (óculos, cartola, gorro,
-  laço, flor)
+- **Extras**: cabeça (antena, folha, orelhas de gato, chifres, auréola, topete, orelhas de
+  coelho, chifre de unicórnio) e acessório (óculos, cartola, gorro, laço, flor, fone de
+  ouvido, coroa, cachecol, gravata-borboleta)
 - **Cor**: as cores do tema atual (acompanham a troca de tema), ou qualquer cor do seletor
   ou de um código hex
 - **Salvos**: guarde os bichinhos que criar (até 24) e use de novo com um clique; copie /
