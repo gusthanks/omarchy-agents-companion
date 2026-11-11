@@ -26,15 +26,21 @@ Você pode remodelá-lo do jeito que quiser.
   faça carinho e ele acorda se espreguiçando.
 - **Pequenas reações**: ele pensa enquanto o uso atualiza, se assusta quando o cursor vem
   correndo, inclina a cabeça quando o cursor para perto, pisca um olá, solta um "ufa" quando
-  uma assinatura bate no teto e um suspiro quando um limite deixa de estar perto. De vez em
+  uma assinatura bate no teto e um suspiro quando ele se acalma. De vez em
   quando espirra ou boceja. Na barra ele só mostra poses paradas, para ficar leve.
 - **Humores pelos limites**: ofegante (boca aberta, bochechas coradas, uma gota de suor e
   baforadas) quando um limite está sendo gasto bem acima de um ritmo constante, preocupado
-  (sobrancelhas levantadas, um "!") quando um limite está perto, cansado ("z") quando todas
-  as assinaturas estouraram, com fome (lambendo os beiços, uma gotinha de baba, garfo e
-  faca) quando uma cota semanal está para reiniciar com boa parte sem uso, e uma festinha de
-  confete quando uma volta. Cansado vence preocupado, que vence ofegante, que vence com
-  fome. A cor dele nunca muda; as barras de limite continuam ficando vermelhas como sempre.
+  (sobrancelhas levantadas, um "!") por dez minutos quando uma assinatura que você está
+  usando passa de 90% (ou um saldo pré-pago que você está gastando chega aos últimos 10%),
+  cansado ("z") quando todas as assinaturas estouraram, com fome (lambendo os beiços, uma
+  gotinha de baba, garfo e faca) quando uma cota semanal está para reiniciar com boa parte
+  sem uso, e uma festinha de confete quando uma volta. O Kian só se preocupa com o que te
+  afeta, e só por um tempo: uma assinatura quase cheia que você não tocou nas últimas duas
+  horas não conta, e a mesma janela só volta a preocupá-lo depois de cair abaixo de 83% ou
+  reiniciar. A única preocupação que dura é não ter para onde ir: todas as assinaturas em
+  90% ou mais. Cansado vence preocupado, que vence ofegante, que vence com fome. A cor dele
+  nunca muda; as barras de limite, as dicas e as notificações continuam ficando vermelhas e
+  avisando como sempre.
 - **Avisos mais claros**: um agente que não pôde ser lido mostra um ícone do tipo de problema
   e uma mensagem legível ("Limite de requisições — tentando de novo em 4m" quando o tempo
   é conhecido). Se o aviso indica o comando de login de uma CLI de agente instalada
@@ -171,12 +177,12 @@ celebrate, yawn, wake, startle, curious, dizzy, wink, sneeze, thinking, oof, ale
 | Ajustes do widget / `shell.json` → `showAs` | `Used` (padrão) ou `Left` (maiúsculas ou minúsculas): se as barras e porcentagens de limite mostram o usado ou o que resta. Os alertas seguem o usado |
 | Ajustes do widget / `shell.json` → `colorCodeUsage` | `true` pinta as barras de verde → amarelo → laranja → vermelho, com as cores do tema, conforme o uso sobe (padrão `false`) |
 | Ajustes do widget / `shell.json` → `showPace` | `false` esconde o tracinho, a seta e a projeção do ritmo (padrão `true`) |
-| Ajustes do widget / `shell.json` → `showPriorities` | `false` esconde o "Use primeiro" e para de guardar o histórico com que ele mede seu ritmo recente (padrão `true`). Aparece enquanto alguma assinatura ficaria com cota sobrando |
+| Ajustes do widget / `shell.json` → `showPriorities` | `false` esconde o "Use primeiro" (padrão `true`). Aparece enquanto alguma assinatura ficaria com cota sobrando |
 | Ajustes do widget / `shell.json` → `recentHours` | Horas de uso recente que a previsão pesa contra a média do ciclo, de 1 a 24 (padrão `3`) |
 | Ajustes do widget / `shell.json` → `alertUnusedPercent`, `alertHours` | Uma cota fica urgente quando pelo menos essa parte ficaria sem uso (padrão `50`) e ela reinicia dentro dessas horas (padrão `24`) |
 | Ajustes do widget / `shell.json` → `priorityMood` | `false` impede o bichinho de ficar com fome por uma cota urgente (padrão `true`) |
 | Ajustes do widget / `shell.json` → `notifications`, `notifyThreshold` | `false` desliga as notificações (padrão `true`); a parte usada, de 50 a 100, em que um limite avisa (padrão `97`), com mais um, urgente, quando ele estoura |
-| Ajustes do widget / `shell.json` → `moodWindow` | `Auto` (padrão), `Session` ou `Weekly` (maiúsculas ou minúsculas): os limites que deixam o bichinho preocupado ou ofegante. Um provedor sem esse tipo continua valendo por todos os seus; cansado sempre quer dizer todas as assinaturas no teto |
+| Ajustes do widget / `shell.json` → `moodWindow` | `Auto` (padrão), `Session` ou `Weekly` (maiúsculas ou minúsculas): os limites que podem deixar o bichinho preocupado (ao passar de 90% enquanto em uso, ou todos em 90%) ou ofegante. Um provedor sem esse tipo continua valendo por todos os seus; cansado sempre quer dizer todas as assinaturas no teto |
 
 ## Privacidade
 
@@ -191,7 +197,11 @@ O bichinho não faz nenhuma chamada de rede. O que ele usa:
 - `agents-pet-<nome>.png` na pasta Imagens, só quando você aperta **Salvar PNG**.
 - `~/.local/state/omarchy/agents-pet/usage-history.json`: as últimas 25 horas de leituras
   de limite (janela, porcentagem, horário de renovação) com que o "Use primeiro" mede seu
-  ritmo recente, só enquanto `showPriorities` está ligado.
+  ritmo recente e o bichinho sabe quais assinaturas estão em uso.
+- `~/.local/state/omarchy/agents-pet/mood-state.json`: com quais janelas de limite (e
+  saldos pré-pagos) o bichinho já se preocupou e quando, o horário da última leitura de
+  cada fonte e o último valor de cada saldo, para ele não se preocupar de novo depois de
+  reiniciar.
 - `~/.local/state/omarchy/agents-pet/notify-state.json`: quais janelas de limite e
   redefinições já foram avisadas, e o horário da última leitura de cada fonte, para nunca
   repetir um aviso; e `~/.cache/omarchy/agents-pet/kian-icon.png`, o bichinho desenhado

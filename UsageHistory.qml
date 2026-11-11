@@ -4,11 +4,12 @@ import Quickshell.Io
 import "usage/Priority.js" as Priority
 
 // The local history of fresh limit readings the priority ranking measures the
-// recent pace from, in $XDG_STATE_HOME/omarchy/agents-pet/usage-history.json:
-// at most 25 hours of {source, window, at, reset, percent}, nothing else. A
-// reading is added when a source's fetch time moves on and it isn't a cached
-// fallback (Priority.append), and the file is written, atomically, only then.
-// With priorities switched off (enabled false) nothing is added or written.
+// recent pace from, and Kian's mood tells a subscription in use by (Mood.js),
+// in $XDG_STATE_HOME/omarchy/agents-pet/usage-history.json: at most 25 hours
+// of {source, window, at, reset, percent}, nothing else. A reading is added
+// when a source's fetch time moves on and it isn't a cached fallback
+// (Priority.append), and the file is written, atomically, only then. With
+// enabled false nothing is added or written; the panel keeps it on.
 Item {
   id: root
   visible: false

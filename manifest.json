@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "gusthx.agents-pet",
   "name": "Agents Pet",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "author": "Gustavo Costa (gusthx)",
   "license": "MIT",
   "description": "A customizable flat pet for your Omarchy bar that follows your cursor and shares calm tips about your AI-agent usage, on top of the stock Agents panel.",
@@ -197,14 +197,14 @@
           "Weekly"
         ],
         "defaultValue": "Auto",
-        "description": "Which limits make the pet worried or out of breath: all of them (Auto), or only the session or only the weekly ones. A provider without the chosen kind keeps all of its own. Tired always means every subscription is capped."
+        "description": "Which limits can make the pet worried (one you are using crossing 90%, for ten minutes, or all of them at 90%) or out of breath: all of them (Auto), or only the session or only the weekly ones. A provider without the chosen kind keeps all of its own. Tired always means every subscription is capped."
       },
       {
         "key": "showPriorities",
         "type": "boolean",
         "label": "Show what to use first",
         "defaultValue": true,
-        "description": "Rank your subscriptions by how much of each weekly quota would go unused at its reset, under \"Use first\" in the panel while one of them would go partly unused. Keeps a small local history of fresh limit readings (25 hours at most) to measure your recent pace; off, nothing is recorded."
+        "description": "Rank your subscriptions by how much of each weekly quota would go unused at its reset, under \"Use first\" in the panel while one of them would go partly unused. It measures your recent pace from a small local history of fresh limit readings (25 hours at most), which the pet's mood also uses to tell which subscriptions are in use."
       },
       {
         "key": "recentHours",

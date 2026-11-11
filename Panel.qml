@@ -13,6 +13,7 @@ import "usage/Display.js" as UsageDisplay
 import "usage/Priority.js" as UsagePriority
 import "usage/Notify.js" as UsageNotify
 import "usage/Notice.js" as UsageNotice
+import "usage/Mood.js" as UsageMood
 
 Panel {
   id: root
@@ -41,7 +42,8 @@ Panel {
   // Which windows Kian's mood watches: auto | session | weekly.
   readonly property string moodWindow: UsageDisplay.normalizeMoodWindow(setting("moodWindow", "auto"))
   // Use it or lose it: which subscription to spend first, before its weekly
-  // quota resets with room left. Off, no reading is kept for it either.
+  // quota resets with room left. Off, the list is hidden; the readings are
+  // still kept for Kian's mood (UsageHistory).
   readonly property bool showPriorities: UsageDisplay.flag(setting("showPriorities", true), true)
   // Whether an urgent quota makes Kian hungry.
   readonly property bool priorityMood: UsageDisplay.flag(setting("priorityMood", true), true)
@@ -163,8 +165,10 @@ Panel {
     writePet({ saved: list })
   }
 
-  // Mood follows the limits: tired when every subscription is maxed out,
-  // worried when one is close, panting when one is going too fast.
+  // Mood follows the limits (see usage/Mood.js and PetMood.qml): tired when
+  // every subscription is maxed out, worried for a while when one you are
+  // spending gets close (or for as long as all of them are), panting when one
+  // is going too fast.
   readonly property var maxedProviders: {
     var out = []
     for (var i = 0; i < providers.length; i++) {
@@ -172,11 +176,6 @@ Panel {
       if (w && w.percent >= 1) out.push(providers[i].providerId || providers[i].providerName || String(i))
     }
     return out
-  }
-  readonly property bool allMaxed: {
-    var withLimits = 0
-    for (var i = 0; i < providers.length; i++) if (bindingWindow(providers[i])) withLimits++
-    return withLimits > 0 && maxedProviders.length >= withLimits
   }
   // Panting when the windows the mood watches are being burned well ahead of
   // an even pace, with room still before the cap; worried and tired win.
@@ -192,8 +191,10 @@ Panel {
   // Hungry when a quota is about to reset with much of it unused: a nudge,
   // so anything about running out (tired, worried, panting) comes first.
   readonly property bool hungry: priorityMood && !!hungryRow
-  readonly property string petMood: allMaxed ? "tired"
-    : (alarming ? "worried" : (hurriedLimit ? "panting" : (hungry ? "hungry" : "normal")))
+  readonly property string petMood: UsageMood.mood({
+    tired: petMoodKeeper.tired, worried: petMoodKeeper.worried,
+    panting: !!hurriedLimit, hungry: hungry
+  })
 
   // A subscription coming back from its cap is worth a little party; one
   // newly hitting its cap gets an "oof".
@@ -247,7 +248,9 @@ Panel {
     return ok
   }
 
-  // A sigh of relief when a limit stops being close without a party.
+  // A sigh of relief when Kian calms down (the worry ran its ten minutes, or
+  // a limit stopped being close) without a party. Only on the way to normal,
+  // and only where it can be seen: the open panel.
   property string lastPetMood: "normal"
   onPetMoodChanged: {
     var was = lastPetMood
@@ -558,18 +561,6 @@ Panel {
       panelFlick.contentY = Math.max(0, top - margin)
     else if (top + item.height + margin > panelFlick.contentY + panelFlick.height)
       panelFlick.contentY = Math.min(panelFlick.contentHeight - panelFlick.height, top + item.height + margin - panelFlick.height)
-  }
-
-  // Kian worries when any account new sessions use is nearly out in the
-  // windows his mood watches, or a prepaid balance is down to its last 10%.
-  // Tired and the cap reactions stay on the fullest window: a cap is a cap.
-  readonly property bool alarming: {
-    for (var i = 0; i < providers.length; i++) {
-      var window = UsageDisplay.fullest(UsageDisplay.moodWindows(limitWindows(providers[i]), moodWindow))
-      if (window && window.percent >= 0.9) return true
-      if (balanceAlarming(providers[i].balance)) return true
-    }
-    return false
   }
 
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
@@ -1559,11 +1550,19 @@ Panel {
   }
 
   // Keeps the fresh limit readings the priority ranking measures the recent
-  // pace from, while priorities are on.
+  // pace from, and Kian's mood tells a subscription in use by. Always on:
+  // the mood needs it even with priorities hidden.
   UsageHistory {
     id: usageHistory
-    enabled: root.showPriorities
     records: usage.enabledProviders
+  }
+
+  // Whether Kian is worried or tired, with its own small state and clock.
+  PetMood {
+    id: petMoodKeeper
+    records: root.providers
+    samples: usageHistory.samples
+    moodWindow: root.moodWindow
   }
 
   Process {

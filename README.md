@@ -25,15 +25,20 @@ reshape it however you like.
   wakes with a stretch.
 - **Small reactions**: it thinks while your usage refreshes, gets startled when the cursor
   rushes at it, tilts its head when the cursor rests nearby, winks hello, lets out an "oof"
-  when a subscription hits its cap and a sigh when a limit stops being close. Now and then
+  when a subscription hits its cap and a sigh when he calms down. Now and then
   it sneezes or yawns. The bar pet only shows still poses, so it stays cheap.
 - **Moods from your limits**: out of breath (open mouth, flushed cheeks, a sweat drop and
   puffs) when a limit is burning well ahead of an even pace, worried (raised brows, a little
-  "!") when one is close, tired ("z") when every subscription is maxed out, hungry (licking
-  its lips, a drop of drool, a fork and knife) when a weekly quota is about to reset with
-  much of it unused, and a small confetti party when one comes back. Tired beats worried,
-  worried beats out of breath, out of breath beats hungry. Its color never changes; the
-  limit bars still turn red as usual.
+  "!") for ten minutes when a subscription you are using crosses 90% (or a prepaid balance
+  you are spending drops to its last 10%), tired ("z") when every subscription is maxed
+  out, hungry (licking its lips, a drop of drool, a fork and knife) when a weekly quota is
+  about to reset with much of it unused, and a small confetti party when one comes back.
+  Kian only worries about what affects you, and only for a while: a nearly full
+  subscription you haven't touched in the last two hours doesn't count, and the same
+  window doesn't worry him again until it drops below 83% or resets. The one lasting worry
+  is having nowhere to go: every subscription at 90% or more. Tired beats worried, worried
+  beats out of breath, out of breath beats hungry. Its color never changes; the limit bars,
+  tips and notifications still turn red and speak up as usual.
 - **Clearer notices**: an agent that cannot be read shows an icon for the kind of trouble and
   a readable message ("Rate limited — trying again in 4m" when the wait is known). When the
   notice names the sign-in command of an installed agent CLI (`cursor-agent login`,
@@ -161,12 +166,12 @@ celebrate, yawn, wake, startle, curious, dizzy, wink, sneeze, thinking, oof, ale
 | Widget settings / `shell.json` → `showAs` | `Used` (default) or `Left`, in any case: what the limit meters and percentages read. Alerts still follow the share used |
 | Widget settings / `shell.json` → `colorCodeUsage` | `true` colors the meters green → yellow → orange → red from the theme as usage climbs (default `false`) |
 | Widget settings / `shell.json` → `showPace` | `false` hides the pace tick, arrow and projection (default `true`) |
-| Widget settings / `shell.json` → `showPriorities` | `false` hides "Use first" and stops keeping the history it measures your recent pace from (default `true`). It shows while a subscription would go partly unused |
+| Widget settings / `shell.json` → `showPriorities` | `false` hides "Use first" (default `true`). It shows while a subscription would go partly unused |
 | Widget settings / `shell.json` → `recentHours` | Hours of recent use the forecast weighs against the cycle's average, 1–24 (default `3`) |
 | Widget settings / `shell.json` → `alertUnusedPercent`, `alertHours` | A quota is urgent when at least this share would go unused (default `50`) and it resets within these hours (default `24`) |
 | Widget settings / `shell.json` → `priorityMood` | `false` keeps the pet from getting hungry over an urgent quota (default `true`) |
 | Widget settings / `shell.json` → `notifications`, `notifyThreshold` | `false` turns the desktop notifications off (default `true`); the share used, 50–100, at which a limit notifies (default `97`), with one more, urgent, when it is spent |
-| Widget settings / `shell.json` → `moodWindow` | `Auto` (default), `Session` or `Weekly`, in any case: the limits that make the pet worried or out of breath. A provider without that kind keeps all of its own; tired always means every subscription is capped |
+| Widget settings / `shell.json` → `moodWindow` | `Auto` (default), `Session` or `Weekly`, in any case: the limits that can make the pet worried (crossing 90% while in use, or all at 90%) or out of breath. A provider without that kind keeps all of its own; tired always means every subscription is capped |
 
 ## Privacy
 
@@ -181,7 +186,10 @@ The pet adds no network calls. What it touches:
 - `agents-pet-<name>.png` in your Pictures folder, only when you press **Save PNG**.
 - `~/.local/state/omarchy/agents-pet/usage-history.json`: the last 25 hours of limit
   readings (window, percentage, reset time) that "Use first" measures your recent pace
-  from, only while `showPriorities` is on.
+  from and the pet tells a subscription in use by.
+- `~/.local/state/omarchy/agents-pet/mood-state.json`: which limit windows (and prepaid
+  balances) the pet already worried about and when, each source's last fetch time and
+  each balance's last amount, so a restart doesn't worry him again.
 - `~/.local/state/omarchy/agents-pet/notify-state.json`: which limit windows and reset
   credits were already notified, and each source's last fetch time, so a notice is never
   repeated; and `~/.cache/omarchy/agents-pet/kian-icon.png`, the pet drawn as the notices'
@@ -229,8 +237,9 @@ PetEditor.qml      pet settings: stage, tabs, try-on, undo, saved pets, backup, 
 PetChip.qml        one framed option chip in the settings
 ColorPicker.qml    saturation/value square + hue strip
 ThemePalette.qml   reads the current theme's named colors
-usage/             pure usage math (windows, pace, priority, notices), tested in dev/tests
+usage/             pure usage math (windows, pace, priority, mood, notices), tested in dev/tests
 UsageHistory.qml   keeps 25 h of fresh limit readings in ~/.local/state/omarchy/agents-pet/
+PetMood.qml        worried / tired, as usage/Mood.js decides: its state and its own timer
 Notifier.qml       desktop notifications: dedupe state, notify-send, the pet as the icon
 Main.qml, Agent.qml, assets/   stock Agents plugin pieces
 i18n/              strings (stock panel strings in 50 languages, pet strings en + pt-BR)

@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.2.1 (2026-11-11)
+
+Kian only worries about what affects you, and only for a while. He used to look worried
+whenever any subscription sat at 90% or more, so with several plans that get spent every
+week he was worried most of the time and his other faces rarely showed.
+
+- **Only what you are using counts.** A subscription is in use when one of its windows
+  rose in the last two hours, read from the local history of fresh limit readings. A nearly
+  full plan you haven't touched no longer worries him.
+- **Worry is a moment.** A subscription in use crossing 90% in the windows his mood
+  watches worries him for ten minutes, then he calms down (with a sigh, if the panel is
+  open). The same window doesn't worry him again until it drops below 83% or resets. A
+  prepaid balance you are spending dropping to its last 10% works the same way, re-armed
+  by a top-up past 15%.
+- **Nowhere to go is the lasting worry.** While every subscription with limits is at 90%
+  or more he stays worried; tired (every one maxed) still wins. Otherwise out of breath and
+  hungry show as before.
+- What he already worried about is kept in
+  `~/.local/state/omarchy/agents-pet/mood-state.json`, so a restart doesn't worry him
+  again; a missing or unreadable file starts over quietly. The ten minutes end on their
+  own timer, with the panel closed too.
+- The red meters, the tips and the desktop notifications are unchanged: they stay the
+  lasting signal.
+- The history of limit readings is now kept with "Use first" hidden too (`showPriorities`
+  off), since the mood needs it.
+- The decision lives in `usage/Mood.js`, with Node tests in `dev/tests/mood.test.mjs`.
+
 ## 2.2.0 (2026-11-11)
 
 Two upgrades in one release: the Pet Studio grows (new bodies, faces, extras, sizes and
