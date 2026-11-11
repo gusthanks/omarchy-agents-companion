@@ -32,6 +32,13 @@ reshape it however you like.
   much of it unused, and a small confetti party when one comes back. Tired beats worried,
   worried beats out of breath, out of breath beats hungry. Its color never changes; the
   limit bars still turn red as usual.
+- **Desktop notifications**: when a limit reaches 97% (`notifyThreshold`), Kian sends a
+  calm notice with his own face as the icon ("Claude Weekly is at 97%. It resets in 1d
+  4h."), an urgent one if it is already spent, and a heads-up when a Codex free reset
+  expires within 48 hours. Once per crossing: a limit re-arms only after dropping 7 points
+  below the threshold or starting a new window, and a restart never repeats one. Readings
+  already on disk when the plugin starts stay quiet. In the bar, Kian jumps with a "!" as
+  one goes out, or lets out his "oof" at a cap.
 - **Use first**: with more than one subscription, a short list above the agents says which
   one to reach for before its weekly quota resets with room left over ("~60% of the weekly
   would go unused, resets in 20h"), then the ones on pace, spent or without current numbers.
@@ -129,7 +136,7 @@ worn, removed, pasted or restored pet. Changes apply live and are saved to
 
 **IPC** (`omarchy-shell gusthx.agents-pet <method>`): `open`, `close`, `show`, `hide`,
 `toggle`, `refresh`, `nextInsight`, `editPet`, `pat`, `celebrate`, `react <name>` (pat, hop,
-celebrate, yawn, wake, startle, curious, dizzy, wink, sneeze, thinking, oof, sigh).
+celebrate, yawn, wake, startle, curious, dizzy, wink, sneeze, thinking, oof, alert, sigh).
 
 ## Configuration
 
@@ -145,6 +152,7 @@ celebrate, yawn, wake, startle, curious, dizzy, wink, sneeze, thinking, oof, sig
 | Widget settings / `shell.json` → `recentHours` | Hours of recent use the forecast weighs against the cycle's average, 1–24 (default `3`) |
 | Widget settings / `shell.json` → `alertUnusedPercent`, `alertHours` | A quota is urgent when at least this share would go unused (default `50`) and it resets within these hours (default `24`) |
 | Widget settings / `shell.json` → `priorityMood` | `false` keeps the pet from getting hungry over an urgent quota (default `true`) |
+| Widget settings / `shell.json` → `notifications`, `notifyThreshold` | `false` turns the desktop notifications off (default `true`); the share used, 50–100, at which a limit notifies (default `97`) |
 | Widget settings / `shell.json` → `moodWindow` | `auto` (default), `session` or `weekly`: the windows that make the pet worried or out of breath. A provider without that window keeps all of its own; tired always means every subscription is capped |
 
 ## Privacy
@@ -161,6 +169,10 @@ The pet adds no network calls. What it touches:
 - `~/.local/state/omarchy/agents-pet/usage-history.json`: the last 25 hours of limit
   readings (window, percentage, reset time) that "Use first" measures your recent pace
   from, only while `showPriorities` is on.
+- `~/.local/state/omarchy/agents-pet/notify-state.json`: which limit windows and reset
+  credits were already notified, and each source's last fetch time, so a notice is never
+  repeated; and `~/.cache/omarchy/agents-pet/kian-icon.png`, the pet drawn as the notices'
+  icon. Neither is kept while `notifications` is off.
 
 Usage numbers come from Omarchy's own stock collectors (`omarchy-agent-usage-*`), the same
 ones the stock Agents panel runs. They read each agent's local credential files (for example
@@ -206,6 +218,7 @@ ColorPicker.qml    saturation/value square + hue strip
 ThemePalette.qml   reads the current theme's named colors
 usage/             pure usage math (windows, pace, priority, notices), tested in dev/tests
 UsageHistory.qml   keeps 25 h of fresh limit readings in ~/.local/state/omarchy/agents-pet/
+Notifier.qml       desktop notifications: dedupe state, notify-send, the pet as the icon
 Main.qml, Agent.qml, assets/   stock Agents plugin pieces
 i18n/              strings (stock panel strings in 50 languages, pet strings en + pt-BR)
 dev/               isolated harness (run.sh, Harness.qml), deploy.sh
@@ -224,7 +237,8 @@ See [CHANGELOG.md](CHANGELOG.md).
 - Parametric pet idea inspired by the Hermes Agent mobile app's bot sculptor.
 - Pacing, use-it-or-lose-it priority, limit notifications, notice parsing and the limit
   display options (used / left, color rungs, the mood's window) in `usage/`, and the "Use
-  first" reasons and details in `Panel.qml`, are ported from [ai-usagebar](https://github.com/akitaonrails/ai-usagebar), MIT,
+  first" reasons and details in `Panel.qml` and the notification delivery in
+  `Notifier.qml`, are ported from [ai-usagebar](https://github.com/akitaonrails/ai-usagebar), MIT,
   Copyright (c) 2026 AkitaOnRails.
 
 ## License

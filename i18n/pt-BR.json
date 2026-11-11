@@ -308,5 +308,17 @@
   "priority.recentCollecting": "Ritmo recente: ainda medindo (precisa de 30 min de leituras)",
   "priority.urgentWhy": "Urgente: pelo menos %1% ficaria sem uso, e reinicia em até %2h.",
   "priority.sessionSpent": "O limite da sessão acabou por agora; volta em algumas horas.",
-  "priority.showLimits": "Clique pra ver os limites."
+  "priority.showLimits": "Clique pra ver os limites.",
+  "notify.nearTitle": "%1 %2 está em %3%",
+  "notify.nearBody": "Volta em %1. Sem pressa, que tal usar outro agente por um tempo?",
+  "notify.nearBodyNoReset": "Sem pressa, que tal usar outro agente por um tempo?",
+  "notify.maxedTitle": "%1 %2 chegou no limite",
+  "notify.maxedBody": "Volta em %1. Bom momento pra uma pausa, ou pra outro agente.",
+  "notify.maxedBodyNoReset": "Bom momento pra uma pausa, ou pra outro agente.",
+  "notify.creditTitle": "%1: uma redefinição gratuita vai expirar",
+  "notify.creditBody": {
+    "many": "Você tem %1 redefinições gratuitas; a próxima expira em %2. Vale usar uma antes que suma.",
+    "one": "Você tem %1 redefinição gratuita e ela expira em %2. Vale usar antes que suma.",
+    "other": "Você tem %1 redefinições gratuitas; a próxima expira em %2. Vale usar uma antes que suma."
+  }
 }

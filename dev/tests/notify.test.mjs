@@ -130,3 +130,39 @@ test('old keys are dropped: lapsed credits and crossings past the longest window
   } };
   assert.deepEqual(Object.keys(N.decide([], 97, state, NOW).nextState.keys), ['codex::Weekly (7-day)']);
 });
+
+test('readings from before the plugin started are recorded quietly, for sources never seen', () => {
+  const old = fetch('codex', [weekly(99)]);
+  const start = clock + MIN;
+  let r = N.decide([old], 97, null, start, start);
+  assert.equal(r.notifications.length, 0, 'old news on a first run');
+  assert.ok(r.nextState.keys['codex::Weekly (7-day)'], 'but it is marked');
+  assert.equal(N.decide([fetch('codex', [weekly(100)])], 97, r.nextState, clock, start).notifications.length, 0, 'the same crossing at 100%');
+  // A source the state knows fires for a reading taken while the shell was down.
+  const known = { seen: { codex: old.limitsFetchedAt - H }, keys: {} };
+  assert.equal(N.decide([old], 97, known, start, start).notifications.length, 1);
+  // A source first seen after the start is news.
+  assert.equal(N.decide([fetch('claude', [weekly(99)])], 97, r.nextState, clock, start).notifications.length, 1);
+  // A quiet credit is marked too, and doesn't fire later.
+  const exp = clock + 15 * MIN + 20 * H;
+  const credit = fetch('codex', [], { resetCredits: { available: 1, nextExpiresAt: iso(exp) } });
+  r = N.decide([credit], 97, null, clock, clock + MIN);
+  assert.equal(r.notifications.length, 0);
+  assert.equal(run([fetch('codex', [], { resetCredits: { available: 1, nextExpiresAt: iso(exp) } })], r.nextState).notifications.length, 0);
+});
+
+test('notify-send argv: no shell, switches first, provider text tamed', () => {
+  assert.deepEqual(N.sendArgs('normal', 'Claude: Weekly at 97%', 'Resets in 1d 4h.', '/c/kian-icon.png'),
+    ['notify-send', '-a', 'Agents Pet', '-u', 'normal', '-i', '/c/kian-icon.png', 'Claude: Weekly at 97%', 'Resets in 1d 4h.']);
+  assert.deepEqual(N.sendArgs('critical', 't', 'b', ''), ['notify-send', '-a', 'Agents Pet', '-u', 'critical', '-t', '30000', 't', 'b']);
+  const args = N.sendArgs('normal', '--help\n$(rm -rf ~)', 'a <b>&</b>\u0007 c', null);
+  assert.deepEqual(args.slice(-2), ['help $(rm -rf ~)', 'a &lt;b&gt;&amp;&lt;/b&gt; c']);
+  assert.equal(N.sendArgs('weird', 'x', 'y')[4], 'normal');
+});
+
+test('persisted state is read back only in its own shape', () => {
+  const s = { seen: { codex: 1 }, keys: { 'codex::Weekly': { notifiedAt: 1, reset: null } } };
+  assert.deepEqual(N.parseState(JSON.stringify(s)), s);
+  for (const bad of ['', '{', 'null', '[]', '{"seen":{}}', '{"seen":1,"keys":{}}'])
+    assert.equal(N.parseState(bad), null, bad);
+});

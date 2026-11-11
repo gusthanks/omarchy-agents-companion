@@ -301,5 +301,16 @@
   "priority.recentCollecting": "Recent pace: still measuring (needs 30 min of readings)",
   "priority.urgentWhy": "Urgent: at least %1% would go unused, and it resets within %2h.",
   "priority.sessionSpent": "The session limit is spent for now; it comes back within hours.",
-  "priority.showLimits": "Click to see its limits."
+  "priority.showLimits": "Click to see its limits.",
+  "notify.nearTitle": "%1 %2 is at %3%",
+  "notify.nearBody": "It resets in %1. No rush, maybe lean on another agent for a while.",
+  "notify.nearBodyNoReset": "No rush, maybe lean on another agent for a while.",
+  "notify.maxedTitle": "%1 %2 is maxed out",
+  "notify.maxedBody": "It comes back in %1. A good moment for a break, or for another agent.",
+  "notify.maxedBodyNoReset": "A good moment for a break, or for another agent.",
+  "notify.creditTitle": "%1: a free reset expires soon",
+  "notify.creditBody": {
+    "one": "You have %1 free reset and it expires in %2. Worth using before it's gone.",
+    "other": "You have %1 free resets; the next one expires in %2. Worth using one before it's gone."
+  }
 }

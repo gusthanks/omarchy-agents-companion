@@ -130,6 +130,16 @@ var CLIPS = {
       { to: E.oof, ms: 120, ease: "outQuad", hold: 700 }
     ]
   },
+  // A desktop notice just went out: eyes wide with a "!", a little jump, and
+  // the pose held long enough to catch on the bar (a capped limit gets "oof").
+  alert: {
+    priority: 3, interrupt: "ignore", mode: "once", release: 300, wakes: true, bar: "pose", cooldown: 5000, peak: 300,
+    steps: [
+      { to: ext(E.startled, { squash: -0.45, hop: -0.06, blinkOk: 0 }), ms: 80, ease: "outQuad", snap: "start" },
+      { to: { squash: 0.15, hop: 0 }, ms: 160, ease: "inQuad" },
+      { to: { squash: 0, eyeScale: 1.15, mouthOpen: 0.45 }, ms: 200, ease: "inOutSine", hold: 1400 }
+    ]
+  },
   sigh: {
     priority: 1, interrupt: "ignore", mode: "once", release: 500, bar: "pose", cooldown: 30000, peak: 500,
     steps: [
@@ -140,7 +150,7 @@ var CLIPS = {
 
 // The reactions worth listing (settings previews, docs, IPC help).
 var NAMES = ["pat", "hop", "celebrate", "yawn", "wake", "startle", "curious", "dizzy",
-             "wink", "sneeze", "thinking", "oof", "sigh"]
+             "wink", "sneeze", "thinking", "oof", "alert", "sigh"]
 
 var MIRRORED = { tilt: 1, gazeX: 1, shiftX: 1, browAsym: 1, mouthX: 1 }
 

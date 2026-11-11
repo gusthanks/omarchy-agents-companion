@@ -33,6 +33,14 @@ Você pode remodelá-lo do jeito que quiser.
   faca) quando uma cota semanal está para reiniciar com boa parte sem uso, e uma festinha de
   confete quando uma volta. Cansado vence preocupado, que vence ofegante, que vence com
   fome. A cor dele nunca muda; as barras de limite continuam ficando vermelhas como sempre.
+- **Notificações na área de trabalho**: quando um limite chega a 97% (`notifyThreshold`),
+  o Kian manda um aviso tranquilo com o próprio rosto de ícone ("Claude Semanal está em
+  97%. Volta em 1d 4h."), um urgente se ele já estourou, e um lembrete quando uma
+  redefinição gratuita do Codex expira em menos de 48 horas. Uma vez por vez que cruza: um
+  limite só volta a avisar depois de cair 7 pontos abaixo do limiar ou começar uma janela
+  nova, e reiniciar nunca repete um aviso. Leituras que já estavam no disco quando o plugin
+  abriu ficam quietas. Na barra, o Kian dá um pulinho com um "!" quando um aviso sai, ou
+  solta o "ufa" quando bate no teto.
 - **Use primeiro**: com mais de uma assinatura, uma lista curta acima dos agentes diz qual
   usar antes que a cota semanal reinicie sobrando ("~60% da semanal ficaria sem uso;
   reinicia em 20h"), depois as que estão no ritmo, esgotadas ou sem números atualizados.
@@ -138,7 +146,7 @@ As imagens mostram a interface em inglês; com o Omarchy em português ela apare
 
 **IPC** (`omarchy-shell gusthx.agents-pet <método>`): `open`, `close`, `show`, `hide`,
 `toggle`, `refresh`, `nextInsight`, `editPet`, `pat`, `celebrate`, `react <nome>` (pat, hop,
-celebrate, yawn, wake, startle, curious, dizzy, wink, sneeze, thinking, oof, sigh).
+celebrate, yawn, wake, startle, curious, dizzy, wink, sneeze, thinking, oof, alert, sigh).
 
 ## Configuração
 
@@ -154,6 +162,7 @@ celebrate, yawn, wake, startle, curious, dizzy, wink, sneeze, thinking, oof, sig
 | Ajustes do widget / `shell.json` → `recentHours` | Horas de uso recente que a previsão pesa contra a média do ciclo, de 1 a 24 (padrão `3`) |
 | Ajustes do widget / `shell.json` → `alertUnusedPercent`, `alertHours` | Uma cota fica urgente quando pelo menos essa parte ficaria sem uso (padrão `50`) e ela reinicia dentro dessas horas (padrão `24`) |
 | Ajustes do widget / `shell.json` → `priorityMood` | `false` impede o bichinho de ficar com fome por uma cota urgente (padrão `true`) |
+| Ajustes do widget / `shell.json` → `notifications`, `notifyThreshold` | `false` desliga as notificações (padrão `true`); a parte usada, de 50 a 100, em que um limite avisa (padrão `97`) |
 | Ajustes do widget / `shell.json` → `moodWindow` | `auto` (padrão), `session` ou `weekly`: as janelas que deixam o bichinho preocupado ou ofegante. Um provedor sem essa janela continua valendo por todas as suas; cansado sempre quer dizer todas as assinaturas no teto |
 
 ## Privacidade
@@ -170,6 +179,10 @@ O bichinho não faz nenhuma chamada de rede. O que ele usa:
 - `~/.local/state/omarchy/agents-pet/usage-history.json`: as últimas 25 horas de leituras
   de limite (janela, porcentagem, horário de renovação) com que o "Use primeiro" mede seu
   ritmo recente, só enquanto `showPriorities` está ligado.
+- `~/.local/state/omarchy/agents-pet/notify-state.json`: quais janelas de limite e
+  redefinições já foram avisadas, e o horário da última leitura de cada fonte, para nunca
+  repetir um aviso; e `~/.cache/omarchy/agents-pet/kian-icon.png`, o bichinho desenhado
+  como ícone dos avisos. Nenhum dos dois é mantido com `notifications` desligado.
 
 Os números de uso vêm dos coletores padrão do próprio Omarchy (`omarchy-agent-usage-*`),
 os mesmos que o painel Agents padrão roda. Eles leem os arquivos de credencial locais de
@@ -217,7 +230,8 @@ Veja o [CHANGELOG.md](CHANGELOG.md) (em inglês).
 - Ideia do bichinho paramétrico inspirada no escultor de robôs do app móvel Hermes Agent.
 - O ritmo, a prioridade de "use ou perca", os avisos de limite, a leitura dos avisos e as
   opções de exibição dos limites (usado / restante, faixas de cor, a janela do humor) em
-  `usage/`, e os motivos e detalhes do "Use primeiro" em `Panel.qml`, foram portados do [ai-usagebar](https://github.com/akitaonrails/ai-usagebar), MIT,
+  `usage/`, os motivos e detalhes do "Use primeiro" em `Panel.qml` e a entrega dos avisos
+  em `Notifier.qml` foram portados do [ai-usagebar](https://github.com/akitaonrails/ai-usagebar), MIT,
   Copyright (c) 2026 AkitaOnRails.
 
 ## Licença

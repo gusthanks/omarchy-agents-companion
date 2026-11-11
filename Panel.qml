@@ -11,6 +11,7 @@ import "usage/Window.js" as UsageWindow
 import "usage/Pacing.js" as UsagePacing
 import "usage/Display.js" as UsageDisplay
 import "usage/Priority.js" as UsagePriority
+import "usage/Notify.js" as UsageNotify
 
 Panel {
   id: root
@@ -49,6 +50,11 @@ Panel {
     alertUnusedPercent: setting("alertUnusedPercent", 50),
     alertHours: setting("alertHours", 24)
   })
+
+  // Desktop notices when a limit nears its cap (see Notifier.qml). The
+  // settings schema keeps the threshold at 50 or more.
+  readonly property bool notificationsOn: UsageDisplay.flag(setting("notifications", true), true)
+  readonly property int notifyThreshold: Math.max(50, UsageNotify.normalizeThreshold(setting("notifyThreshold", UsageNotify.DEFAULT_THRESHOLD)))
 
   // Persisted pet: name + look, written by the inline editor.
   readonly property string petConfigPath: (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")) + "/omarchy/agents-pet.json"
@@ -213,7 +219,16 @@ Panel {
     lastMaxed = maxedProviders
     lastUnderCap = under
     if (back) petCelebrate()
-    else if (hit) petReact("oof")
+    else if (hit) petOof()
+  }
+
+  // The meters and a critical notice can both see the same cap land; one
+  // "oof" covers it.
+  property double lastOofMs: 0
+  function petOof() {
+    if (Date.now() - lastOofMs < 30000) return
+    lastOofMs = Date.now()
+    petReact("oof")
   }
 
   function petCelebrate() {
@@ -1403,6 +1418,54 @@ Panel {
   Main {
     id: usage
     settings: root.settings
+  }
+
+  // Desktop notices, decided after fresh fetches; worded here, in Kian's calm
+  // voice. Kian reacts as one goes out: "oof" at a cap, a startled "!" for
+  // anything else.
+  Notifier {
+    id: notifier
+    enabled: root.notificationsOn
+    threshold: root.notifyThreshold
+    records: usage.enabledProviders
+    look: root.petLook
+    themePalette: petPalette
+    foreground: root.foreground
+    onFired: function(list) { root.announce(list) }
+  }
+
+  function announce(list) {
+    var capped = false
+    for (var i = 0; i < list.length; i++) {
+      var text = notificationText(list[i], Date.now())
+      notifier.send(list[i].urgency, text.title, text.body)
+      if (list[i].kind === "limit" && list[i].urgency === "critical") capped = true
+    }
+    if (capped) petOof()
+    else if (list.length > 0) petReact("alert")
+  }
+
+  function notificationText(n, now) {
+    var who = n.accountLabel ? n.name + " · " + n.accountLabel : n.name
+    if (n.kind === "credit") {
+      return {
+        title: petStrings.t("notify.creditTitle").arg(who),
+        body: petStrings.tn("notify.creditBody", n.count).arg(Commons.I18n.formatNumber(n.count)).arg(formatDuration(n.expiresAt - now))
+      }
+    }
+    var win = windowDisplayTitle(n.title)
+    var resetIn = UsageWindow.timeMs(n.resetAt) - now
+    var reset = resetIn > 0 ? formatDuration(resetIn) : ""
+    if (n.urgency === "critical") {
+      return {
+        title: petStrings.t("notify.maxedTitle").arg(who).arg(win),
+        body: reset !== "" ? petStrings.t("notify.maxedBody").arg(reset) : petStrings.t("notify.maxedBodyNoReset")
+      }
+    }
+    return {
+      title: petStrings.t("notify.nearTitle").arg(who).arg(win).arg(Commons.I18n.formatNumber(n.percent)),
+      body: reset !== "" ? petStrings.t("notify.nearBody").arg(reset) : petStrings.t("notify.nearBodyNoReset")
+    }
   }
 
   // Keeps the fresh limit readings the priority ranking measures the recent

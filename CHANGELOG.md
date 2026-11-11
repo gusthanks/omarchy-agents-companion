@@ -70,14 +70,30 @@
   `recentHours`, `alertUnusedPercent`, `alertHours` and `priorityMood`. Configs without
   them get the defaults.
 
+### Notifications
+
+- **Desktop notifications** after fresh fetches, through `notify-send` (argv, never a
+  shell) as "Agents Pet": normal when a limit reaches `notifyThreshold` (default 97%),
+  critical (30 s) when it is spent, and one heads-up per Codex free reset expiring within
+  48 hours. Worded in Kian's calm voice in English and Brazilian Portuguese, with his face
+  as the icon (`~/.cache/omarchy/agents-pet/kian-icon.png`, redrawn when the look or theme
+  changes; no icon until it is). One notice per crossing, re-armed 7 points below the
+  threshold or by a new window; the state is written atomically to
+  `~/.local/state/omarchy/agents-pet/notify-state.json` before anything is shown, and any
+  failure skips the notice. Readings already on disk when the plugin starts, from a source
+  the state has never seen (first run, lost state), are recorded quietly.
+- Kian jumps with a startled "!" (the new **alert** reaction, shown on the bar too) when a
+  notice goes out, and lets out his "oof" for a cap, only once when the meters see it too.
+- New widget settings: `notifications` (default on) and `notifyThreshold` (50–100).
+
 ### Usage math
 
 - The limit-window rules (titles, lengths, expired resets) moved from the panel to
   `usage/Window.js`; the panel shows the same thing.
 - New pure, tested libraries in `usage/`: pacing with a projection to the reset (now shown
   on the meters), a use-it-or-lose-it priority across subscriptions and accounts (now shown
-  under "Use first"), and, not shown yet, limit and reset credit notification decisions,
-  and notice parsing. Ported from
+  under "Use first"), limit and reset credit notification decisions (now sent as desktop
+  notifications) and, not shown yet, notice parsing. Ported from
   ai-usagebar (MIT).
 - The panel keeps the last 25 hours of fresh limit readings in
   `~/.local/state/omarchy/agents-pet/usage-history.json` (percentages and reset times

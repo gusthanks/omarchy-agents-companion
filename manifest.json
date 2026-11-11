@@ -109,7 +109,9 @@
       "recentHours": 3,
       "alertUnusedPercent": 50,
       "alertHours": 24,
-      "priorityMood": true
+      "priorityMood": true,
+      "notifications": true,
+      "notifyThreshold": 97
     },
     "schema": [
       {
@@ -240,6 +242,23 @@
         "label": "Pet gets hungry over urgent quota",
         "defaultValue": true,
         "description": "The pet looks hungry while a quota is urgent, below worried, tired and out of breath."
+      },
+      {
+        "key": "notifications",
+        "type": "boolean",
+        "label": "Desktop notifications",
+        "defaultValue": true,
+        "description": "The pet sends a desktop notice when a limit reaches the threshold below (an urgent one at 100%), and when a Codex free reset is about to expire. Once per crossing; readings from before the plugin started stay quiet."
+      },
+      {
+        "key": "notifyThreshold",
+        "type": "integer",
+        "label": "Notify at (% used)",
+        "min": 50,
+        "max": 100,
+        "step": 1,
+        "defaultValue": 97,
+        "description": "A limit notifies once when its usage reaches this share, and again only after it drops 7 points below or a new window starts."
       }
     ]
   },

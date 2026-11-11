@@ -13,6 +13,13 @@
 // caller to keep. Notifications are data (who, which window, how far); the
 // wording is the panel's job.
 //
+// quietBeforeMs (optional): a source the state has never seen, read before
+// that instant, is recorded without firing. It is the plugin's start: a
+// reading already on disk when Kian started watching (a first run, a lost
+// state file, a new account) is old news the panel shows anyway, while a
+// source the state knows keeps firing for a reading taken while the shell
+// was down, since that one is new.
+//
 // State: { seen: { sourceKey: fetchedAtMs },
 //          keys: { "source::label" | "source::credit::expiresMs":
 //                  { notifiedAt, reset } } }
@@ -43,7 +50,7 @@ function resetMovedLater(current, recorded) {
   return current - Number(recorded) > RESET_MOVE_TOLERANCE_MS
 }
 
-function decide(records, threshold, prevState, nowMs) {
+function decide(records, threshold, prevState, nowMs, quietBeforeMs) {
   var limit = normalizeThreshold(threshold)
   var rearmBelow = limit - HYSTERESIS_PCT
   var prev = prevState || {}
@@ -63,6 +70,7 @@ function decide(records, threshold, prevState, nowMs) {
   for (var i = 0; i < list.length; i++) {
     var src = list[i]
     if (src.stale || !(src.fetchedAt > Number(seen[src.key] || 0))) continue
+    var quiet = seen[src.key] === undefined && src.fetchedAt < Number(quietBeforeMs || 0)
     seen[src.key] = src.fetchedAt
     var who = { source: src.key, provider: src.provider, name: src.name, account: src.account, accountLabel: src.accountLabel }
 
@@ -76,7 +84,7 @@ function decide(records, threshold, prevState, nowMs) {
         var armed = !keys[key] || resetMovedLater(reset, keys[key].reset)
         if (!armed) continue
         keys[key] = { notifiedAt: nowMs, reset: isFinite(reset) ? reset : null }
-        fired.push(Object.assign({
+        if (!quiet) fired.push(Object.assign({
           kind: "limit", key: key,
           urgency: pct >= 100 ? "critical" : "normal",
           window: win.label, title: win.title, percent: pct, resetAt: win.resetAt
@@ -93,7 +101,7 @@ function decide(records, threshold, prevState, nowMs) {
       var creditKey = src.key + "::credit::" + expires
       if (left > 0 && left <= CREDIT_WARNING_MS && !keys[creditKey]) {
         keys[creditKey] = { notifiedAt: nowMs, reset: expires }
-        fired.push(Object.assign({
+        if (!quiet) fired.push(Object.assign({
           kind: "credit", key: creditKey, urgency: "normal",
           count: Number(credits.available), expiresAt: expires
         }, who))
@@ -101,4 +109,48 @@ function decide(records, threshold, prevState, nowMs) {
     }
   }
   return { notifications: fired, nextState: { seen: seen, keys: keys } }
+}
+
+// ---------------------------------------------------------------- delivery
+
+var APP_NAME = "Agents Pet"
+// Omarchy's notifier keeps a critical toast until it is dismissed unless the
+// sender asks for a timeout; a spent limit is worth seeing, not pinning.
+var CRITICAL_TIMEOUT_MS = 30000
+
+// One line of plain text: provider names and labels come from the usage
+// records, so control characters go, and a leading dash can't pass for a
+// notify-send switch.
+function oneLine(text) {
+  var s = String(text === undefined || text === null ? "" : text)
+  s = s.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim()
+  return s.replace(/^-+\s*/, "").slice(0, 240)
+}
+
+// Notification daemons read the body as markup.
+function escapeMarkup(text) {
+  return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+}
+
+// notify-send's argv for one notice, run as a process: never a shell string.
+// The switches come first; notify-send reads the trailing two as title and
+// body. Without an icon path the notice simply goes without one.
+function sendArgs(urgency, title, body, iconPath) {
+  var critical = urgency === "critical"
+  var args = ["notify-send", "-a", APP_NAME, "-u", critical ? "critical" : "normal"]
+  if (critical) args.push("-t", String(CRITICAL_TIMEOUT_MS))
+  if (iconPath) args.push("-i", String(iconPath))
+  args.push(oneLine(title), escapeMarkup(oneLine(body)))
+  return args
+}
+
+// The persisted state, read back: anything that isn't the expected shape is
+// no state at all (nothing notified, every source unseen).
+function parseState(text) {
+  try {
+    var s = JSON.parse(String(text || ""))
+    if (s && typeof s === "object" && s.seen && typeof s.seen === "object" && s.keys && typeof s.keys === "object")
+      return { seen: s.seen, keys: s.keys }
+  } catch (e) {}
+  return null
 }

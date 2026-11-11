@@ -181,7 +181,7 @@ ShellRoot {
         model: [
           { label: "mood", cells: [{ mood: "normal" }, { mood: "hungry" }, { mood: "panting" }, { mood: "worried" }, { mood: "tired" }, { mood: "asleep" }, { mood: "happy" }] },
           { label: "reactions", cells: [{ pose: "yawn" }, { pose: "wake" }, { pose: "startle" }, { pose: "curious" }, { pose: "dizzy" }] },
-          { label: "", cells: [{ pose: "wink" }, { pose: "sneeze" }, { pose: "thinking" }, { pose: "oof" }, { pose: "sigh" }] },
+          { label: "", cells: [{ pose: "wink" }, { pose: "sneeze" }, { pose: "thinking" }, { pose: "oof" }, { pose: "alert" }, { pose: "sigh" }] },
           { label: "cyclops", cells: [{ mood: "hungry" }, { mood: "worried" }, { mood: "asleep" }, { mood: "happy" }, { pose: "wink" }, { pose: "startle" }], set: { eyes: "cyclops", accessory: "none" } },
           { label: "", cells: [{ pose: "curious" }, { pose: "thinking" }, { pose: "dizzy" }, { pose: "yawn" }, { pose: "oof" }], set: { eyes: "cyclops", accessory: "none" } },
           { label: "size", cells: [
