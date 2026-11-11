@@ -5,8 +5,8 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 
-// Pet settings ("Pet Studio"): a header (stage, dice, name, size in the bar,
-// status line), five tabs (Shape, Face, Extras, Color, Saved) over a page of
+// Pet settings ("Pet Studio"): a header (stage, dice, name, status line),
+// five tabs (Shape, Face, Extras, Color, Saved) over a page of
 // fixed height, and a footer (Undo, Reset, Done).
 //
 // Edits apply at once through signals; the panel persists them. Hovering an
@@ -18,7 +18,9 @@ Item {
 
   property var look: ({})
   property string petName: ""
-  property string petSize: "m"
+  // s | m | l, each on its own: the pet in the bar and the one in the panel.
+  property string barSize: "m"
+  property string panelSize: "m"
   // lively | calm | still (see BlobAvatar.reactions)
   property string petReactions: "lively"
   property var saved: []
@@ -40,7 +42,8 @@ Item {
 
   signal lookEdited(var look)
   signal nameEdited(string name)
-  signal sizeEdited(string size)
+  // key: barSize | panelSize
+  signal sizeEdited(string key, string size)
   signal reactionsEdited(string reactions)
   signal saveCurrent()
   signal wear(int index)
@@ -48,7 +51,7 @@ Item {
   signal imported(string name, var look)
   signal done()
   // Panel wiring: move the shared cursor, keep an item in view, and put back
-  // a snapshot ({name, look, saved, size, reactions}; any subset).
+  // a snapshot ({name, look, saved, barSize, panelSize, reactions}; any subset).
   signal pointRequested(string kind, int index)
   signal revealRequested(Item item)
   signal restore(var snapshot)
@@ -259,11 +262,12 @@ Item {
       name: root.petName,
       look: root.withTrait("color", root.value("color")),
       saved: root.saved.slice(),
-      size: root.petSize,
+      barSize: root.barSize,
+      panelSize: root.panelSize,
       reactions: root.petReactions
     }
     var s = {}
-    keys = keys || ["name", "look", "saved", "size", "reactions"]
+    keys = keys || ["name", "look", "saved", "barSize", "panelSize", "reactions"]
     for (var i = 0; i < keys.length; i++) s[keys[i]] = all[keys[i]]
     root.lastSnapshot = s
   }
@@ -274,10 +278,12 @@ Item {
     if (n !== root.petName) root.touch("name")
     root.nameEdited(n)
   }
-  function editSize(v) {
-    root.touch("size")
-    root.sizeEdited(v)
+  function editSize(key, v) {
+    if (v === root[key]) return
+    root.touch(key)
+    root.sizeEdited(key, v)
   }
+  function validSize(v, fallback) { return ["s", "m", "l"].indexOf(v) >= 0 ? v : fallback }
 
   function undo() {
     if (!root.lastSnapshot) return
@@ -390,15 +396,15 @@ Item {
 
   // ------------------------------------------------------------ full backup
   // Everything about the pet in one JSON file: the current pet, the saved
-  // pets, the size in the bar and the personality.
+  // pets, both sizes and the personality.
   function backupData() {
     var list = []
     for (var i = 0; i < root.saved.length && i < 24; i++) {
       var p = root.saved[i] || {}
       list.push({ name: String(p.name || "").slice(0, 24), look: root.sanitize(p.look) })
     }
-    return { agentsPetBackup: 1, name: root.petName, look: root.sanitize(root.look), size: root.petSize,
-             reactions: root.petReactions, saved: list }
+    return { agentsPetBackup: 1, name: root.petName, look: root.sanitize(root.look),
+             barSize: root.barSize, panelSize: root.panelSize, reactions: root.petReactions, saved: list }
   }
 
   // A backup (or a single pet code) read back, with every field checked the
@@ -409,7 +415,10 @@ Item {
       return { name: String(data.name || "").slice(0, 24), look: root.sanitize(data.look) }
     if (data.agentsPetBackup !== 1) return null
     var out = { name: String(data.name || "").slice(0, 24), look: root.sanitize(data.look) }
-    out.size = ["s", "m", "l"].indexOf(data.size) >= 0 ? data.size : root.petSize
+    // Backups from before the two sizes carry one "size" for both.
+    var legacy = root.validSize(data.size, "")
+    out.barSize = root.validSize(data.barSize, legacy || root.barSize)
+    out.panelSize = root.validSize(data.panelSize, legacy || root.panelSize)
     out.reactions = ["lively", "calm", "still"].indexOf(data.reactions) >= 0 ? data.reactions : root.petReactions
     var list = []
     if (Array.isArray(data.saved)) {
@@ -585,11 +594,13 @@ Item {
 
   readonly property var keyRows: {
     var rows = []
-    rows.push([{ kind: "pet.name", index: 0 }, { kind: "pet.random", index: 0 }].concat(root.cells("pet.size", 3)))
+    rows.push([{ kind: "pet.name", index: 0 }, { kind: "pet.random", index: 0 }])
     rows.push(root.cells("pet.tab", 5))
     if (root.tab === 0) {
       rows.push(root.cells("pet.body", 5))
       rows.push(root.cells("pet.style", 2))
+      rows.push(root.cells("pet.barSize", 3))
+      rows.push(root.cells("pet.panelSize", 3))
     } else if (root.tab === 1) {
       rows.push(root.cells("pet.eyes", 5))
       rows.push(root.cells("pet.mouth", 5))
@@ -641,7 +652,7 @@ Item {
     var k = String(target.kind).slice(4), i = target.index
     if (k === "name") root.focusName()
     else if (k === "random") root.randomize()
-    else if (k === "size") root.editSize(["s", "m", "l"][i])
+    else if (k === "barSize" || k === "panelSize") root.editSize(k, ["s", "m", "l"][i])
     else if (k === "tab") root.setTab(i, true)
     else if (root.chipKeys.indexOf(k) >= 0) root.commit(k, root.optionsOf(k)[i])
     else if (k === "style") root.commit("style", ["solid", "outline"][i])
@@ -715,6 +726,7 @@ Item {
   // so switching tabs never moves the footer.
   readonly property real fixedPageHeight: {
     var shape = root.headH + root.headGap + root.chip5 + root.sectionGap + root.headH + root.headGap + root.buttonH
+      + root.sectionGap + 2 * root.buttonH + root.headGap
     var face = 2 * (root.headH + root.headGap + root.chip5 + root.sectionGap) + root.rowH + root.sectionGap
       + root.headH + root.headGap + root.buttonH + root.headGap + root.buttonH
     var extras = root.headH + root.headGap + root.chip5 + root.sectionGap + root.headH + root.headGap + root.chip6
@@ -738,7 +750,7 @@ Item {
     width: parent.width
     spacing: Style.space(10)
 
-    // ---------- Header: stage · name · size · status ----------
+    // ---------- Header: stage · name · status ----------
     Item {
       width: parent.width
       height: Math.max(stage.height, headerCol.implicitHeight)
@@ -795,35 +807,6 @@ Item {
           hasCursor: root.isKey("pet.name")
           onHoveredChanged: if (hovered) root.pointRequested("pet.name", 0)
           onEditingFinished: root.editName(text.trim())
-        }
-
-        Row {
-          spacing: Style.space(8)
-          Text {
-            anchors.verticalCenter: parent.verticalCenter
-            textFormat: Text.PlainText
-            text: strings.t("pet.sizeInBar", "SIZE IN BAR")
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            font.bold: true
-          }
-          ButtonGroup {
-            spacing: Style.space(4)
-            focusable: false
-            fontSize: Style.font.bodySmall
-            fontFamily: root.fontFamily
-            foreground: root.foreground
-            value: root.petSize
-            options: [
-              { value: "s", label: "S", tooltip: strings.t("pet.size.s", "Small") },
-              { value: "m", label: "M", tooltip: strings.t("pet.size.m", "Medium") },
-              { value: "l", label: "L", tooltip: strings.t("pet.size.l", "Large") }
-            ]
-            cursorIndex: root.keyTarget && root.keyTarget.kind === "pet.size" ? root.keyTarget.index : -1
-            onChanged: function(v) { root.editSize(v) }
-            onHovered: function(i, h) { if (h) root.pointRequested("pet.size", i) }
-          }
         }
 
         Text {
@@ -1019,6 +1002,12 @@ Item {
           onChanged: function(v) { root.commit("style", v) }
           onHovered: function(i, h) { if (h) root.pointRequested("pet.style", i) }
         }
+      }
+      Column {
+        width: parent.width
+        spacing: root.headGap
+        SizeRow { key: "barSize"; label: strings.t("pet.size.bar", "Size in the bar") }
+        SizeRow { key: "panelSize"; label: strings.t("pet.size.panel", "Size in the panel") }
       }
     }
   }
@@ -1381,6 +1370,47 @@ Item {
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: head.trying
+    }
+  }
+
+  // A label and S / M / L for one of the pet's sizes (key: barSize | panelSize).
+  component SizeRow: Item {
+    id: sizeRow
+    property string key: ""
+    property string label: ""
+    width: parent ? parent.width : 100
+    height: root.buttonH
+
+    Text {
+      anchors.left: parent.left
+      anchors.right: sizeGroup.left
+      anchors.rightMargin: Style.space(8)
+      anchors.verticalCenter: parent.verticalCenter
+      elide: Text.ElideRight
+      textFormat: Text.PlainText
+      text: sizeRow.label
+      color: root.foreground
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.bodySmall
+    }
+    ButtonGroup {
+      id: sizeGroup
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      spacing: Style.space(4)
+      focusable: false
+      fontSize: Style.font.bodySmall
+      fontFamily: root.fontFamily
+      foreground: root.foreground
+      value: root[sizeRow.key]
+      options: [
+        { value: "s", label: "S", tooltip: strings.t("pet.size.s", "Small") },
+        { value: "m", label: "M", tooltip: strings.t("pet.size.m", "Medium") },
+        { value: "l", label: "L", tooltip: strings.t("pet.size.l", "Large") }
+      ]
+      cursorIndex: root.keyTarget && root.keyTarget.kind === "pet." + sizeRow.key ? root.keyTarget.index : -1
+      onChanged: function(v) { root.editSize(sizeRow.key, v) }
+      onHovered: function(i, h) { if (h) root.pointRequested("pet." + sizeRow.key, i) }
     }
   }
 

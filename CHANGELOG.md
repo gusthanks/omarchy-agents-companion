@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Pet Studio
+
+- The pet's size in the bar and in the panel are now two settings (S / M / L each), in the
+  **Shape** tab; the stage header keeps the pet and its name. Configs and backups with the
+  old single `size` use it for both until one is changed.
+
+### Panel
+
+- The tip under the pet's name is shown whole, wrapped over up to four lines, instead of
+  one line that only opened on hover. The pet and the name stay put as tips of different
+  lengths rotate; the panel below eases to the new height. Hovering still pauses the
+  rotation, and the › button now fades to the next tip like the timed rotation.
+
 ## 2.1.1 (2026-11-09)
 
 ### Panel

@@ -15,7 +15,7 @@ reshape it however you like.
 ## What you get
 
 - **A pet in your bar**: the bar icon is the pet itself, blinking quietly. Its size follows
-  your bar height.
+  your bar height (S / M / L on top of that, set apart from the pet in the panel).
 - **A living pet in the panel**: it breathes, blinks and, while the panel is open, follows
   your cursor anywhere on the screen. Click it to give it a pat: it squishes, smiles and lets
   a heart float up (a few pats in a row and it hops, too many make it dizzy). Leave the mouse
@@ -64,15 +64,16 @@ size-vertical = 32
 
 ## Use
 
-Click the pet in the bar to open the panel. The tip line under the pet's name shows one
-line: hover it to read the whole tip (rotation pauses meanwhile), and the › button jumps to
-the next one. Limit alerts are shown in red. Click the pet for a pat.
+Click the pet in the bar to open the panel. The tip under the pet's name is shown whole,
+wrapped over a few lines; hovering it pauses the rotation, and the › button jumps to the
+next one. Limit alerts are shown in red. Click the pet for a pat.
 
 **Pet Studio**: click the gear in the panel header. A stage with the pet and a random
-(shuffle) button, its name and its size in the bar (S / M / L) sit on top; five tabs below,
-and Undo / Reset / Done at the bottom:
+(shuffle) button and its name sit on top; five tabs below, and Undo / Reset / Done at the
+bottom:
 
-- **Shape**: body (blob, orb, squircle, drop, ghost) and style (solid or outline)
+- **Shape**: body (blob, orb, squircle, drop, ghost), style (solid or outline), and the
+  pet's size in the bar and in the panel (S / M / L each)
 - **Face**: eyes (capsule, dots, googly, pixel, sleepy), mouth (none, smile, surprised,
   cat, flat), blush cheeks, and the **personality**: Lively (every reaction and little
   fidgets), Calm (reacts to you, no idle fidgets) or Still (poses only, no animated
@@ -84,7 +85,7 @@ and Undo / Reset / Done at the bottom:
   the custom picker / a hex code
 - **Saved**: keep the pets you make (up to 24) and wear them again in one click; copy /
   paste a pet as a short JSON code; **Back up all** writes the current pet, saved pets,
-  size and personality to `agents-pet-backup.json` in your Documents folder (the XDG one,
+  sizes and personality to `agents-pet-backup.json` in your Documents folder (the XDG one,
   usually `~/Documents`, or `~/` when there is none) and **Restore** reads it back with
   the same checks as a pasted code; **Save PNG** saves the pet as a transparent 1024 px
   image `agents-pet-<name>.png` in your Pictures folder (XDG, usually `~/Pictures`)

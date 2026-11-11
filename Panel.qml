@@ -48,9 +48,17 @@ Panel {
   readonly property var petLook: petConfig.look || ({})
   // Bar pet as a share of the bar's height (theme token size-horizontal), so a
   // taller bar gets a bigger pet. The bar itself never grows for the pet.
-  readonly property real barPetSize: Math.round(Style.bar.sizeHorizontal * (petSize === "s" ? 0.7 : (petSize === "l" ? 0.96 : 0.85)))
-  readonly property string petSize: ["s", "m", "l"].indexOf(petConfig.size) >= 0 ? petConfig.size : "m"
-  readonly property real petHeroSize: Style.space(petSize === "s" ? 44 : (petSize === "l" ? 66 : 54))
+  readonly property real barPetSize: Math.round(Style.bar.sizeHorizontal * (petBarSize === "s" ? 0.7 : (petBarSize === "l" ? 0.96 : 0.85)))
+  readonly property real petHeroSize: Style.space(petPanelSize === "s" ? 44 : (petPanelSize === "l" ? 66 : 54))
+  // s | m | l for the bar and the panel. Configs from before the two sizes
+  // have one "size" for both; the next write stores them apart.
+  function petSizeOf(key) {
+    var ok = ["s", "m", "l"]
+    if (ok.indexOf(petConfig[key]) >= 0) return petConfig[key]
+    return ok.indexOf(petConfig.size) >= 0 ? petConfig.size : "m"
+  }
+  readonly property string petBarSize: petSizeOf("barSize")
+  readonly property string petPanelSize: petSizeOf("panelSize")
   // Replaced only when the list really changes: every config write parses a
   // new array, and a new one would rebuild every saved-pet card in the editor.
   property var petSaved: []
@@ -75,7 +83,7 @@ Panel {
 
   // Merge a change into the pet config file and write it back.
   function writePet(patch) {
-    var cfg = { name: petConfig.name || "", look: petLook, size: petSize, saved: petSaved }
+    var cfg = { name: petConfig.name || "", look: petLook, barSize: petBarSize, panelSize: petPanelSize, saved: petSaved }
     if (petConfig.reactions !== undefined) cfg.reactions = petConfig.reactions
     for (var k in patch) cfg[k] = patch[k]
     petConfigFile.setText(JSON.stringify(cfg, null, 2) + "\n")
@@ -93,7 +101,7 @@ Panel {
   // Undo snapshots and restored backups: put back whatever keys they carry.
   function restorePet(s) {
     var patch = {}
-    var keys = ["name", "look", "saved", "size", "reactions"]
+    var keys = ["name", "look", "saved", "barSize", "panelSize", "reactions"]
     for (var i = 0; i < keys.length; i++) if (s && s[keys[i]] !== undefined) patch[keys[i]] = s[keys[i]]
     writePet(patch)
   }
@@ -1477,8 +1485,13 @@ Panel {
           Item {
             id: hero
             width: parent.width
-            implicitHeight: Math.max(heroAvatar.visible ? heroAvatar.implicitHeight : 0,
-                                     heroTop.height + (tipLine.visible ? tipLine.height + Style.space(8) : 0))
+            readonly property real tipGap: Style.space(8)
+            // The pet is centered against the name, the token count and the
+            // tip's first line. A longer tip only grows downward, so rotating
+            // tips never moves the pet or the name.
+            readonly property real headBlock: heroTop.height + (tipLine.visible ? tipGap + tipLine.firstLineHeight : 0)
+            readonly property real headZone: Math.max(heroAvatar.visible ? heroAvatar.implicitHeight : 0, headBlock)
+            implicitHeight: Math.max(headZone, heroTop.y + heroTop.height + (tipLine.visible ? tipGap + tipLine.height : 0))
 
             property real metaOpacity: 1.0
 
@@ -1487,8 +1500,7 @@ Panel {
               // While editing, only the pet being edited is shown.
               visible: !root.petEditing
               anchors.left: parent.left
-              // Centered on the whole hero (name, tokens and tip line).
-              anchors.verticalCenter: parent.verticalCenter
+              y: (hero.headZone - height) / 2
               size: root.petHeroSize
               animated: root.opened
               lively: root.opened
@@ -1505,8 +1517,7 @@ Panel {
             Item {
             id: heroTop
             x: heroAvatar.visible ? heroAvatar.width + Style.space(12) : 0
-            // Center the text block (labels + tip line) against the pet too.
-            y: Math.max(0, (hero.height - height - (tipLine.visible ? tipLine.height + Style.space(8) : 0)) / 2)
+            y: (hero.headZone - hero.headBlock) / 2
             width: parent.width - x
             height: Math.max(heroLabelsCol.implicitHeight, trailingButtons.implicitHeight)
 
@@ -1596,16 +1607,28 @@ Panel {
             }
             }
 
-            // ---------- Tip line: one line under the name; hover to read it whole ----------
+            // ---------- Tip line: the whole tip, wrapped under the name ----------
             Item {
               id: tipLine
-              readonly property bool expanded: tipLineHover.hovered
+              // The first line sits level with the icon and the › button.
+              readonly property real lineHeight: tipText.implicitHeight / Math.max(1, tipText.lineCount)
+              readonly property real textTop: Math.max(0, (nextTip.height - lineHeight) / 2)
+              readonly property real firstLineHeight: Math.max(nextTip.height, textTop + lineHeight)
               visible: root.addStage === "" && !root.blankSlate && !root.petEditing && !!root.currentInsight
               anchors.top: heroTop.bottom
-              anchors.topMargin: Style.space(8)
+              anchors.topMargin: hero.tipGap
               x: heroTop.x
               width: parent.width - x
-              height: Math.max(tipText.implicitHeight, nextTip.height)
+              height: Math.max(nextTip.height, textTop + tipText.implicitHeight)
+              // Tips differ in length: on a rotation the panel below eases to
+              // the new height while the tip fades in, and the clip reveals
+              // extra lines as it grows. Only then, so the first layout (and a
+              // re-wrap on resize) lands at once.
+              Behavior on height {
+                enabled: phraseSwap.running
+                NumberAnimation { duration: Style.duration(200); easing.type: Easing.OutCubic }
+              }
+              clip: true
               opacity: hero.metaOpacity
 
               HoverHandler {
@@ -1630,17 +1653,23 @@ Panel {
                 anchors.right: nextTip.left
                 anchors.rightMargin: Style.space(4)
                 anchors.top: parent.top
-                anchors.topMargin: tipLine.expanded ? 0 : Math.max(0, (nextTip.height - implicitHeight) / 2)
+                anchors.topMargin: tipLine.textTop
                 textFormat: Text.PlainText
                 text: root.currentInsight ? root.currentInsight.phrase : ""
                 color: root.currentInsightIsAlert ? Commons.Color.urgent : root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.bodySmall
                 font.weight: root.currentInsightIsAlert ? Font.DemiBold : Font.Normal
-                // One line until hovered, then the whole tip.
-                wrapMode: tipLine.expanded ? Text.WordWrap : Text.NoWrap
-                elide: tipLine.expanded ? Text.ElideNone : Text.ElideRight
-                maximumLineCount: tipLine.expanded ? 6 : 1
+                // Tips run to about three lines; the cap only guards a long
+                // translation, which then shows whole in a tooltip.
+                wrapMode: Text.WordWrap
+                elide: Text.ElideRight
+                maximumLineCount: 4
+              }
+
+              PanelToolTip {
+                visible: tipLineHover.hovered && tipText.truncated && !nextTipMouse.containsMouse
+                text: tipText.text
               }
 
               Rectangle {
@@ -1669,7 +1698,8 @@ Panel {
                   anchors.fill: parent
                   hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
-                  onClicked: root.showNextInsight()
+                  // The same fade as the timed rotation.
+                  onClicked: phraseSwap.restart()
                 }
 
                 PanelToolTip {
@@ -1687,7 +1717,8 @@ Panel {
             width: parent.width
             look: root.petLook
             petName: root.petConfig.name || ""
-            petSize: root.petSize
+            barSize: root.petBarSize
+            panelSize: root.petPanelSize
             petReactions: root.petReactions
             saved: root.petSaved
             keyTarget: root.keyTarget
@@ -1703,7 +1734,7 @@ Panel {
             fontFamily: root.fontFamily
             onLookEdited: function(look) { root.writePet({ look: look }) }
             onNameEdited: function(name) { if (name !== (root.petConfig.name || "")) root.writePet({ name: name }) }
-            onSizeEdited: function(size) { root.writePet({ size: size }) }
+            onSizeEdited: function(key, size) { var patch = {}; patch[key] = size; root.writePet(patch) }
             onSaveCurrent: root.savePetToInventory()
             onWear: function(index) { root.wearSavedPet(index) }
             onForget: function(index) { root.forgetSavedPet(index) }

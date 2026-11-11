@@ -240,7 +240,9 @@ ShellRoot {
         width: 344
         look: shell.petLook
         petName: shell.petName
-        petSize: shell.petConfig.size || "m"
+        // Older configs have one "size" for both.
+        barSize: shell.petConfig.barSize || shell.petConfig.size || "m"
+        panelSize: shell.petConfig.panelSize || shell.petConfig.size || "m"
         petReactions: shell.petConfig.reactions || "lively"
         saved: shell.mockSaved
         themePalette: themeColors
@@ -322,7 +324,7 @@ ShellRoot {
         backupPath: shell.out + "/agents-pet-backup.json"
         onRestore: function(s) {
           console.log("CHECK restore keys=" + Object.keys(s).join(",") + " saved=" + (s.saved ? s.saved.length : "-")
-                      + " size=" + s.size + " reactions=" + s.reactions + " name=" + s.name)
+                      + " bar=" + s.barSize + " panel=" + s.panelSize + " reactions=" + s.reactions + " name=" + s.name)
         }
         onStatusChanged: if (status !== "") console.log("CHECK status: " + status)
       }
@@ -368,6 +370,11 @@ ShellRoot {
             e.textKey("4", 0); e.activate({ kind: "pet.swatch", index: e.swatches.length }); console.log("CHECK custom -> picker " + e.pickerOpen)
             console.log("CHECK Esc closes picker " + e.back() + " then " + e.back())
             console.log("CHECK chipFrame bow=" + e.chipFrame("accessory", "bow") + " glasses=" + e.chipFrame("accessory", "glasses"))
+            // Backups from before the two sizes: "size" fills whichever is missing.
+            var legacy = e.sanitizeBackup({ agentsPetBackup: 1, size: "s" })
+            var mixed = e.sanitizeBackup({ agentsPetBackup: 1, size: "s", barSize: "l" })
+            console.log("CHECK legacy size bar=" + legacy.barSize + " panel=" + legacy.panelSize
+                        + " mixed bar=" + mixed.barSize + " panel=" + mixed.panelSize)
           }
           else if (s === 8) {
             var ed = fileEditor
@@ -555,7 +562,7 @@ ShellRoot {
           // Stand-in for the panel: in-memory only, never written.
           onLookEdited: function(l) { look = l }
           onNameEdited: function(n) { petName = n }
-          onSizeEdited: function(s) { petSize = s }
+          onSizeEdited: function(key, s) { previewEditor[key] = s }
           onReactionsEdited: function(r) { petReactions = r }
           onPointRequested: function(kind, index) { keyTarget = { kind: kind, index: index } }
           onSaveCurrent: saved = saved.concat([{ name: petName, look: look }])
@@ -566,7 +573,8 @@ ShellRoot {
             if (s.name !== undefined) petName = s.name
             if (s.look) look = s.look
             if (s.saved) saved = s.saved
-            if (s.size) petSize = s.size
+            if (s.barSize) barSize = s.barSize
+            if (s.panelSize) panelSize = s.panelSize
             if (s.reactions) petReactions = s.reactions
           }
           pngDir: "/tmp/agents-pet-dev-out"

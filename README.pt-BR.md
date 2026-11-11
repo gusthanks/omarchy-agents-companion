@@ -15,7 +15,8 @@ Você pode remodelá-lo do jeito que quiser.
 ## O que você ganha
 
 - **Um bichinho na barra**: o ícone da barra é o próprio bichinho, piscando de leve. O
-  tamanho acompanha a altura da barra.
+  tamanho acompanha a altura da barra (Pequeno / Médio / Grande por cima disso, separado
+  do bichinho do painel).
 - **Um bichinho vivo no painel**: ele respira, pisca e, com o painel aberto, segue o cursor
   em qualquer lugar da tela. Clique nele para fazer carinho: ele se espreme, sorri e solta
   um coração (alguns carinhos seguidos e ele pula; carinho demais deixa ele tonto). Deixe o
@@ -66,16 +67,16 @@ size-vertical = 32
 
 ## Uso
 
-Clique no bichinho na barra para abrir o painel. A linha de dica sob o nome mostra uma
-linha só: passe o mouse para ler a dica inteira (a troca pausa enquanto isso), e o botão ›
-pula para a próxima. Alertas de limite aparecem em vermelho. Clique no bichinho para fazer
-carinho.
+Clique no bichinho na barra para abrir o painel. A dica sob o nome aparece inteira, em
+algumas linhas; passar o mouse por cima pausa a troca, e o botão › pula para a próxima.
+Alertas de limite aparecem em vermelho. Clique no bichinho para fazer carinho.
 
 **Pet Studio**: clique na engrenagem no topo do painel. Em cima ficam um palco com o
-bichinho e um botão de sorteio, o nome e o tamanho na barra (Pequeno / Médio / Grande); embaixo, cinco
-abas, e Desfazer / Restaurar / Pronto no rodapé:
+bichinho, um botão de sorteio e o nome; embaixo, cinco abas, e Desfazer / Restaurar /
+Pronto no rodapé:
 
-- **Forma**: corpo (bolha, orbe, quadradinho, gota, fantasma) e estilo (sólido ou contorno)
+- **Forma**: corpo (bolha, orbe, quadradinho, gota, fantasma), estilo (sólido ou contorno)
+  e o tamanho do bichinho na barra e no painel (Pequeno / Médio / Grande, cada um)
 - **Rosto**: olhos (cápsula, pontinhos, esbugalhados, pixel, sonolentos), boca (nenhuma,
   sorriso, surpresa, gatinho, reta), bochechas coradas e a **personalidade**: Animado (todas
   as reações e pequenas manias), Calmo (reage a você, sem manias à toa) ou Quieto
@@ -87,7 +88,7 @@ abas, e Desfazer / Restaurar / Pronto no rodapé:
   ou de um código hex
 - **Salvos**: guarde os bichinhos que criar (até 24) e use de novo com um clique; copie /
   cole um bichinho como um código JSON curto; **Backup** grava o bichinho
-  atual, os salvos, o tamanho e a personalidade em `agents-pet-backup.json` na sua pasta
+  atual, os salvos, os tamanhos e a personalidade em `agents-pet-backup.json` na sua pasta
   Documentos (a do XDG, normalmente `~/Documents`, ou `~/` se não houver) e **Restaurar**
   lê de volta com as mesmas verificações de um código colado; **Salvar PNG** salva o
   bichinho como imagem transparente de 1024 px `agents-pet-<nome>.png` na sua pasta
