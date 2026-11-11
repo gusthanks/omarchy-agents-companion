@@ -78,6 +78,8 @@ Item {
     return /^#[0-9a-fA-F]{6}$/.test(root.colorChoice) ? root.colorChoice : root.accentColor
   }
   readonly property bool solid: root.fillStyle === "solid"
+  // Bar and chip size: fine details are dropped or drawn bolder below this.
+  readonly property bool tiny: root.size < 28
   readonly property color featureColor: root.solid ? root.background : root.foreground
   // Hats, bows and petals stick out past the body, so they need to read on
   // the panel background too: use the theme's text color.
@@ -609,42 +611,50 @@ Item {
   // (the end puffs share their lowest point).
   readonly property var cloudPuffs: [[-0.7, 0.42, 0.4], [-0.43, -0.14, 0.42], [0, -0.36, 0.5], [0.43, -0.14, 0.42], [0.7, 0.42, 0.4]]
 
+  // Per-frame scratch for cloudPath, which runs at animation rate, so it
+  // allocates nothing: each puff's swelled radius, and the x, y where each
+  // pair of neighbouring puffs meets.
+  readonly property var cloudR: [0, 0, 0, 0, 0]
+  readonly property var cloudMeet: [0, 0, 0, 0, 0, 0, 0, 0]
+
+  // Where puff i crosses puff i + 1 on the outside of the cloud (the crossing
+  // farther from the cloud's middle), into cloudMeet[2i], cloudMeet[2i + 1].
+  function cloudMeetAt(i) {
+    var p = root.cloudPuffs, cr = root.cloudR
+    var ax = p[i][0], ay = p[i][1], ar = cr[i]
+    var dx = p[i + 1][0] - ax, dy = p[i + 1][1] - ay, br = cr[i + 1]
+    var d = Math.sqrt(dx * dx + dy * dy)
+    var along = (ar * ar - br * br + d * d) / (2 * d)
+    var h = Math.sqrt(Math.max(0, ar * ar - along * along))
+    var mx = ax + along * dx / d, my = ay + along * dy / d
+    var x1 = mx - h * dy / d, y1 = my + h * dx / d
+    var x2 = mx + h * dy / d, y2 = my - h * dx / d
+    var far = x1 * x1 + (y1 - 0.2) * (y1 - 0.2) > x2 * x2 + (y2 - 0.2) * (y2 - 0.2)
+    root.cloudMeet[2 * i] = far ? x1 : x2
+    root.cloudMeet[2 * i + 1] = far ? y1 : y2
+  }
+
   function cloudPath(ctx, cx, cy, r, sx, sy, t) {
-    var p = root.cloudPuffs
+    var p = root.cloudPuffs, cr = root.cloudR, cm = root.cloudMeet
     var n = p.length
-    var c = []
     for (var i = 0; i < n; i++) {
       // The top puffs swell in turn; the end puffs keep the base level.
       var swell = i === 0 || i === n - 1 ? 0 : 0.03 * root.face.wobble * Math.sin(t * 2 + i * 1.9)
-      c.push({ x: p[i][0], y: p[i][1], r: p[i][2] * (1 + swell) })
+      cr[i] = p[i][2] * (1 + swell)
     }
-    // Where two neighbouring puffs cross, on the outside of the cloud.
-    function meet(a, b) {
-      var dx = b.x - a.x, dy = b.y - a.y
-      var d = Math.sqrt(dx * dx + dy * dy)
-      var along = (a.r * a.r - b.r * b.r + d * d) / (2 * d)
-      var h = Math.sqrt(Math.max(0, a.r * a.r - along * along))
-      var mx = a.x + along * dx / d, my = a.y + along * dy / d
-      var p1 = { x: mx - h * dy / d, y: my + h * dx / d }
-      var p2 = { x: mx + h * dy / d, y: my - h * dx / d }
-      var d1 = p1.x * p1.x + (p1.y - 0.2) * (p1.y - 0.2)
-      var d2 = p2.x * p2.x + (p2.y - 0.2) * (p2.y - 0.2)
-      return d1 > d2 ? p1 : p2
-    }
-    var meets = []
-    for (var j = 0; j < n - 1; j++) meets.push(meet(c[j], c[j + 1]))
+    for (var j = 0; j < n - 1; j++) root.cloudMeetAt(j)
     var first = true
     for (var k = 0; k < n; k++) {
-      var q = c[k]
+      var qx = p[k][0], qy = p[k][1], qr = cr[k]
       // The end puffs start / stop at their lowest point (angle pi / 2).
-      var from = k === 0 ? Math.PI / 2 : Math.atan2(meets[k - 1].y - q.y, meets[k - 1].x - q.x)
-      var to = k === n - 1 ? Math.PI / 2 : Math.atan2(meets[k].y - q.y, meets[k].x - q.x)
+      var from = k === 0 ? Math.PI / 2 : Math.atan2(cm[2 * k - 1] - qy, cm[2 * k - 2] - qx)
+      var to = k === n - 1 ? Math.PI / 2 : Math.atan2(cm[2 * k + 1] - qy, cm[2 * k] - qx)
       while (to <= from) to += Math.PI * 2
       var steps = Math.max(4, Math.ceil((to - from) / 0.2))
       for (var s = 0; s <= steps; s++) {
         var a = from + (to - from) * s / steps
-        var px = cx + r * sx * (q.x + q.r * Math.cos(a))
-        var py = cy + r * sy * (q.y + q.r * Math.sin(a))
+        var px = cx + r * sx * (qx + qr * Math.cos(a))
+        var py = cy + r * sy * (qy + qr * Math.sin(a))
         if (first) { ctx.moveTo(px, py); first = false } else ctx.lineTo(px, py)
       }
     }
@@ -975,8 +985,14 @@ Item {
       ctx.fill()
       if (blink > 0.5) {
         ctx.fillStyle = hi
-        disc(ctx, ex - sw * 0.34, ey - sh * 0.38 * blink, sw * 0.36)
-        disc(ctx, ex + sw * 0.36, ey + sh * 0.4 * blink, sw * 0.17)
+        // A tiny pet gets one big glint instead: two small ones blur into
+        // specks, and the eye would read as plain dots.
+        if (root.tiny) {
+          disc(ctx, ex - sw * 0.2, ey - sh * 0.3 * blink, sw * 0.55)
+        } else {
+          disc(ctx, ex - sw * 0.34, ey - sh * 0.38 * blink, sw * 0.36)
+          disc(ctx, ex + sw * 0.36, ey + sh * 0.4 * blink, sw * 0.17)
+        }
         ctx.fillStyle = col
       }
     } else if (eye === "heart") {
@@ -1096,6 +1112,11 @@ Item {
     var mx = cx + eyes.gx * 0.8 + f.mouthX * r
     // Bigger eyes (and the cyclops's) push the mouth down a little.
     var my = eyes.ey + r * (0.38 + 0.1 * (root.eyeSize - 1) + (root.oneEye ? 0.08 : 0))
+    // The cyclops's round lens grows past that push at big eye sizes: keep
+    // the mouth's top (about 0.09r over its anchor, times its size) under
+    // the rim (see paintAccessory).
+    if (root.oneEye && root.accessory === "glasses")
+      my = Math.max(my, eyes.ey + r * (0.29 * root.eyeSize + 0.065 + 0.04 + 0.09 * root.mouthSize))
     // The look's mouth size scales every mouth, the reactions' too. A mouth
     // that would hang past the chin shrinks a little, then moves up.
     var ms = root.mouthSize
@@ -1141,24 +1162,27 @@ Item {
       ctx.fillStyle = root.tongueColor
       root.disc(ctx, mx, my + r * 0.12, r * 0.09)
     } else if (m === "fang") {
-      // A small smile with one little fang hanging from it (a light tooth
-      // with an ink rim, so it reads as a tooth and not a blot).
+      // A small smile with one fang hanging from its right side: a light
+      // tooth drawn over the line, its base on the line's lower edge and a
+      // thin ink rim, so it reads as a tooth and not a drip. Tiny pets
+      // skip the rim, which would eat the whole tooth.
       var fr = r * 0.14, fc = my - r * 0.08
-      var a1 = Math.PI * 0.2, a2 = Math.PI * 0.42
-      var x1 = mx + Math.cos(a1) * fr, y1 = fc + Math.sin(a1) * fr
-      var x2 = mx + Math.cos(a2) * fr, y2 = fc + Math.sin(a2) * fr
-      ctx.moveTo(x1, y1)
-      ctx.lineTo((x1 + x2) / 2 + r * 0.01, Math.max(y1, y2) + r * 0.12)
-      ctx.lineTo(x2, y2)
+      ctx.arc(mx, fc, fr, Math.PI * 0.2, Math.PI * 0.8, false)
+      ctx.stroke()
+      var fa = Math.PI * 0.32, fb = fr + r * 0.025
+      var fx = mx + Math.cos(fa) * fb, fy = fc + Math.sin(fa) * fb
+      var tx = -Math.sin(fa) * r * 0.075, ty = Math.cos(fa) * r * 0.075
+      ctx.beginPath()
+      ctx.moveTo(fx + tx, fy + ty - r * 0.02)
+      ctx.lineTo(fx - tx, fy - ty - r * 0.02)
+      ctx.lineTo(fx - r * 0.01, fy + r * 0.13)
       ctx.closePath()
       ctx.fillStyle = root.solid ? root.rgba(root.foreground, 1) : root.rgba(root.background, 0.9)
       ctx.fill()
-      ctx.lineWidth = r * 0.03
-      ctx.stroke()
-      ctx.beginPath()
-      ctx.lineWidth = r * 0.08
-      ctx.arc(mx, fc, fr, Math.PI * 0.2, Math.PI * 0.8, false)
-      ctx.stroke()
+      if (!root.tiny) {
+        ctx.lineWidth = r * 0.02
+        ctx.stroke()
+      }
     } else if (m === "tongue") {
       // A smile with the tongue sticking out from under it.
       var tw = r * 0.08, ty = my + r * 0.03
@@ -1182,12 +1206,18 @@ Item {
       ctx.stroke()
     } else if (m === "smirk") {
       // A sideways half smile: flat on the left, curling up on the right.
-      ctx.moveTo(mx - r * 0.1, my + r * 0.02)
-      ctx.quadraticCurveTo(mx + r * 0.06, my + r * 0.06, mx + r * 0.14, my - r * 0.05)
-      // and a dimple at the curl
-      ctx.moveTo(mx + r * 0.11, my - r * 0.09)
-      ctx.quadraticCurveTo(mx + r * 0.16, my - r * 0.07, mx + r * 0.17, my - r * 0.02)
+      ctx.moveTo(mx - r * 0.13, my + r * 0.02)
+      ctx.quadraticCurveTo(mx + r * 0.03, my + r * 0.06, mx + r * 0.11, my - r * 0.05)
       ctx.stroke()
+      // and a thin dimple clear of the curl, so the two don't merge into a
+      // hook (too small to tell apart on a tiny pet, so left out there).
+      if (!root.tiny) {
+        ctx.beginPath()
+        ctx.lineWidth = r * 0.05
+        ctx.moveTo(mx + r * 0.19, my - r * 0.1)
+        ctx.quadraticCurveTo(mx + r * 0.225, my - r * 0.06, mx + r * 0.2, my - r * 0.015)
+        ctx.stroke()
+      }
     } else if (m === "frown") {
       ctx.arc(mx, my + r * 0.1, r * 0.14, Math.PI * 1.2, Math.PI * 1.8, false)
       ctx.stroke()

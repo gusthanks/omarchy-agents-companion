@@ -89,10 +89,11 @@ Pronto no rodapé:
   coelho, chifre de unicórnio) e acessório (óculos, cartola, gorro, laço, flor, fone de
   ouvido, coroa, cachecol, gravata-borboleta)
 - **Cor**: as cores do tema atual (acompanham a troca de tema), ou qualquer cor do seletor
-  ou de um código hex
+  ou de um código hex; uma linha **Recentes** guarda as últimas 8 cores personalizadas
+  (continuam lá depois de Desfazer e Restaurar, e vão junto no backup)
 - **Salvos**: guarde os bichinhos que criar (até 24) e use de novo com um clique; copie /
   cole um bichinho como um código JSON curto; **Backup** grava o bichinho
-  atual, os salvos, os tamanhos e a personalidade em `agents-pet-backup.json` na sua pasta
+  atual, os salvos, os tamanhos, a personalidade e as cores recentes em `agents-pet-backup.json` na sua pasta
   Documentos (a do XDG, normalmente `~/Documents`, ou `~/` se não houver) e **Restaurar**
   lê de volta com as mesmas verificações de um código colado; **Salvar PNG** salva o
   bichinho como imagem transparente de 1024 px `agents-pet-<nome>.png` na sua pasta

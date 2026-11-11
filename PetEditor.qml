@@ -4,6 +4,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "PetColors.js" as PetColors
 
 // Pet settings ("Pet Studio"): a header (stage, dice, name, status line),
 // five tabs (Shape, Face, Extras, Color, Saved) over a page of
@@ -283,20 +284,9 @@ Item {
   function fileOf(p) { return String(p).slice(String(p).lastIndexOf("/") + 1) }
 
   // ------------------------------------------------------------ edits
-  // Only valid #rrggbb, distinct ignoring case, newest first, at most 8.
-  function cleanRecent(list) {
-    var out = []
-    if (!Array.isArray(list)) return out
-    for (var i = 0; i < list.length && out.length < 8; i++) {
-      var c = String(list[i]).toLowerCase()
-      if (/^#[0-9a-f]{6}$/.test(c) && out.indexOf(c) < 0) out.push(c)
-    }
-    return out
-  }
-
   function commit(key, val) {
     if (key === "color" && String(val).charAt(0) === "#")
-      root.recentEdited(root.cleanRecent([val].concat(root.recentColors)))
+      root.recentEdited(PetColors.cleanRecent([val].concat(root.recentColors)))
     root.touch("look")
     root.tryOn = null
     root.lookEdited(root.withTrait(key, val))
@@ -482,7 +472,7 @@ Item {
       }
     }
     out.saved = list
-    out.recentColors = Array.isArray(data.recentColors) ? root.cleanRecent(data.recentColors) : root.recentColors
+    out.recentColors = Array.isArray(data.recentColors) ? PetColors.cleanRecent(data.recentColors) : root.recentColors
     return out
   }
 
@@ -1104,9 +1094,9 @@ Item {
         foreground: root.foreground
         hasCursor: root.isKey("pet.cheeks")
         onHasCursorChanged: if (hasCursor) root.revealRequested(cheeksRow)
+        // Flush left like the size rows above it and the section heads.
         Text {
           anchors.left: parent.left
-          anchors.leftMargin: Style.space(8)
           anchors.verticalCenter: parent.verticalCenter
           textFormat: Text.PlainText
           text: strings.t("pet.cheeksToggle", "Blush cheeks")

@@ -83,10 +83,11 @@ bottom:
 - **Extras**: head (antenna, leaf, cat ears, horns, halo, tuft, bunny ears, unicorn horn)
   and accessory (glasses, top hat, beanie, bow, flower, headphones, crown, scarf, bow tie)
 - **Color**: your current theme's colors (they follow theme switches), or any color from
-  the custom picker / a hex code
+  the custom picker / a hex code; a **Recent** row keeps your last 8 custom colors (kept
+  through Undo and Reset, and in backups)
 - **Saved**: keep the pets you make (up to 24) and wear them again in one click; copy /
   paste a pet as a short JSON code; **Back up all** writes the current pet, saved pets,
-  sizes and personality to `agents-pet-backup.json` in your Documents folder (the XDG one,
+  sizes, personality and recent colors to `agents-pet-backup.json` in your Documents folder (the XDG one,
   usually `~/Documents`, or `~/` when there is none) and **Restore** reads it back with
   the same checks as a pasted code; **Save PNG** saves the pet as a transparent 1024 px
   image `agents-pet-<name>.png` in your Pictures folder (XDG, usually `~/Pictures`)

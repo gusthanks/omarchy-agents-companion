@@ -5,6 +5,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "PetColors.js" as PetColors
 
 Panel {
   id: root
@@ -70,11 +71,12 @@ Panel {
     petSavedJson = json
     petSaved = list
   }
-  // Recent custom colors, cleaned by the editor and replaced only on a real change.
+  // Recent custom colors, cleaned here (the editor may not be loaded) and
+  // replaced only on a real change.
   property var petRecent: []
   property string petRecentJson: "[]"
   function syncPetRecent() {
-    var list = petEditorItem.cleanRecent(petConfig.recentColors)
+    var list = PetColors.cleanRecent(petConfig.recentColors)
     var json = JSON.stringify(list)
     if (json === petRecentJson) return
     petRecentJson = json
@@ -91,11 +93,14 @@ Panel {
   property int petTab: 0
   onPetEditingChanged: if (petEditing && panelFlick) panelFlick.contentY = 0
 
-  // Merge a change into the pet config file and write it back.
+  // Merge a change into the pet config file and write it back. The old single
+  // "size" (the bar's) is still written for a while, so an older copy of the
+  // plugin reading the same file keeps the bar pet's size.
   function writePet(patch) {
     var cfg = { name: petConfig.name || "", look: petLook, barSize: petBarSize, panelSize: petPanelSize, saved: petSaved, recentColors: petRecent }
     if (petConfig.reactions !== undefined) cfg.reactions = petConfig.reactions
     for (var k in patch) cfg[k] = patch[k]
+    cfg.size = cfg.barSize
     petConfigFile.setText(JSON.stringify(cfg, null, 2) + "\n")
   }
 

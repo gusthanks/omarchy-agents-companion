@@ -17,9 +17,12 @@
   The Extras tab wraps both kinds of chips five to a row.
 - Four new eyes: **Star**, **Sparkly** (big anime eyes with glints), **Cyclops** (one big
   eyeball whose pupil follows the cursor) and **Heart** (beats softly). Four new mouths:
-  **Fang**, **Tongue**, **Grin** and **Smirk**. Every reaction reads with them; the cyclops
-  gets a single brow (it arches when worried, tilts when curious), one squeezed `><` eye,
-  one spiral, a wink that shuts its eye, and glasses become one round lens.
+  **Fang** (a light tooth under a small smile), **Tongue**, **Grin** and **Smirk** (a half
+  smile with a dimple). Every reaction reads with them; the cyclops gets a single brow (it
+  arches when worried, tilts when curious), one squeezed `><` eye, one spiral, a wink that
+  shuts its eye, and glasses become one round lens, with the mouth kept clear of it at
+  every eye size. At bar size the sparkly eyes get one big glint so they don't read as
+  dots, and fine details (the fang's rim, the smirk's dimple) are left out.
 - **Eye size** and **mouth size** (XS to XL) in the **Face** tab, saved with the look
   (saved pets, codes, backups, PNG, undo and reset; shuffle stays near the middle).
   Eyes and brows stay inside every body at the largest size, and a big mouth or a yawn
@@ -32,7 +35,8 @@
   chips wrap to a second row; shuffle picks the new bodies too.
 - The pet's size in the bar and in the panel are now two settings (S / M / L each), in the
   **Shape** tab; the stage header keeps the pet and its name. Configs and backups with the
-  old single `size` use it for both until one is changed.
+  old single `size` use it for both until one is changed, and the config still gets a
+  `size` (the bar's) so an older copy of the plugin reading the same file keeps working.
 
 ### Panel
 
