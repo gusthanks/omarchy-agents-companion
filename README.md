@@ -32,6 +32,11 @@ reshape it however you like.
   much of it unused, and a small confetti party when one comes back. Tired beats worried,
   worried beats out of breath, out of breath beats hungry. Its color never changes; the
   limit bars still turn red as usual.
+- **Clearer notices**: an agent that cannot be read shows an icon for the kind of trouble and
+  a readable message ("Rate limited — trying again in 4m" when the wait is known). When the
+  notice names a sign-in command of an installed agent CLI (`cursor-agent login`), a **Fix**
+  button (reachable by keyboard) runs it in a floating terminal and refreshes the limits when
+  it closes.
 - **Desktop notifications**: when a limit reaches 97% (`notifyThreshold`), Kian sends a
   calm notice with his own face as the icon ("Claude Weekly is at 97%. It resets in 1d
   4h."), an urgent one if it is already spent, and a heads-up when a Codex free reset

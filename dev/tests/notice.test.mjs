@@ -64,3 +64,20 @@ test('a record status with its help line', () => {
   assert.equal(N.fromStatus('', ''), null);
   assert.equal(N.fromStatus('Limits paused', '').body, 'Limits paused');
 });
+
+test('rate limit waits in seconds, minutes or hours; none when unnamed or zero', () => {
+  assert.equal(N.retryAfterMs('rate limiting checks right now (retry after 30s).'), 30000);
+  assert.equal(N.retryAfterMs('rate limited; next attempt in 4m'), 240000);
+  assert.equal(N.retryAfterMs('Too many requests, try again in 2 minutes'), 120000);
+  assert.equal(N.retryAfterMs('please retry in 1 hour'), 3600000);
+  assert.equal(N.retryAfterMs('(retry after 0s)'), 0);
+  assert.equal(N.retryAfterMs('HTTP 429'), 0);
+  assert.equal(N.retryAfterMs(undefined), 0);
+});
+
+test('a fix runs only a known agent CLI, as plain words', () => {
+  assert.deepEqual(N.fixArgv('claude auth login'), ['claude', 'auth', 'login']);
+  assert.deepEqual(N.fixArgv('cursor-agent login'), ['cursor-agent', 'login']);
+  for (const bad of ['rm -rf ~', 'omarchy pkg aur add x', 'bash -c x', 'claude $(id)', 'claude "a b"', 'claude ~/x', '', undefined, 'claude 1 2 3 4 5 6 7 8'])
+    assert.deepEqual(N.fixArgv(bad), [], String(bad));
+});

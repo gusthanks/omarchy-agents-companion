@@ -79,3 +79,33 @@ function fromStatus(status, help) {
   notice.retry = notice.category === "network" || notice.category === "rate_limit"
   return notice
 }
+
+// Collectors say when a rate-limited check will be tried again ("retry after
+// 30s", "next attempt in 4m", "try again in 2 minutes"). 0 when no usable
+// wait is named; a zero wait is as good as none.
+var RETRY = /\b(?:retry(?:ing)?|try(?:ing)? again|next attempt|backoff)\s*(?:after|in|:)?\s*(\d+(?:\.\d+)?)\s*(seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h)\b/i
+
+function retryAfterMs(text) {
+  var match = RETRY.exec(String(text || ""))
+  if (!match) return 0
+  var unit = match[2].toLowerCase().charAt(0) === "h" ? 3600000 : match[2].toLowerCase().indexOf("m") === 0 ? 60000 : 1000
+  var ms = Math.round(Number(match[1]) * unit)
+  return isFinite(ms) && ms > 0 ? ms : 0
+}
+
+// The agent CLIs a notice's command may start. Anything else (a package
+// manager, a shell, an editor) is text to read, not a button to press.
+var AGENT_CLIS = ["claude", "codex", "gemini", "copilot", "cursor-agent", "grok", "kimi",
+  "opencode", "agy", "devin", "droid", "qwen", "vibe", "muse"]
+
+function agentClis() { return AGENT_CLIS.slice() }
+
+// The notice's command as an argument list, or [] when it is not a known agent
+// CLI's. Each word is plain (no quotes, no expansion), so the list can go to
+// an exec as it is.
+function fixArgv(command) {
+  var words = String(command || "").trim().split(/\s+/)
+  if (words.length === 0 || words.length > 8 || AGENT_CLIS.indexOf(words[0]) < 0) return []
+  for (var i = 0; i < words.length; i++) if (!/^[A-Za-z0-9_.\/=@:-]+$/.test(words[i])) return []
+  return words
+}

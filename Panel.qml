@@ -12,6 +12,7 @@ import "usage/Pacing.js" as UsagePacing
 import "usage/Display.js" as UsageDisplay
 import "usage/Priority.js" as UsagePriority
 import "usage/Notify.js" as UsageNotify
+import "usage/Notice.js" as UsageNotice
 
 Panel {
   id: root
@@ -113,7 +114,7 @@ Panel {
     petRecent = list
   }
   onPetConfigChanged: { syncPetSaved(); syncPetRecent() }
-  Component.onCompleted: { syncPetSaved(); syncPetRecent() }
+  Component.onCompleted: { syncPetSaved(); syncPetRecent(); findClis() }
   // How lively the pet's reactions are: lively | calm | still.
   readonly property string petReactions: ["lively", "calm", "still"].indexOf(petConfig.reactions) >= 0 ? petConfig.reactions : "lively"
   Commons.Translations { id: petStrings; directory: Qt.resolvedUrl("i18n") }
@@ -397,13 +398,13 @@ Panel {
     }
     return out
   }
-  readonly property var pickedEntry: keyTarget && ["account", "autoswitch", "signin"].indexOf(keyTarget.kind) >= 0
+  readonly property var pickedEntry: keyTarget && ["account", "autoswitch", "signin", "fix"].indexOf(keyTarget.kind) >= 0
     ? accountEntries[keyTarget.index] || null
     : null
 
   // The keyboard walks everything on the page that does something, in
   // reading order, one row at a time: the hero's buttons, the "Use first"
-  // lines, then each agent's header, its Sign-in required link or switchable accounts, and the starter
+  // lines, then each agent's header, its Sign-in required or Fix link or switchable accounts, and the starter
   // tiles, or the agents to add while picking one. Up and down change rows, left and right move along one.
   // Hovering moves the same cursor, so only one thing is lit.
   readonly property var keyRows: {
@@ -434,11 +435,13 @@ Panel {
         var accounts = providerAccounts(providers[p])
         if (accounts.length < 2) {
           if (needsSignIn(providers[p])) rows.push([{ kind: "providerSignin", index: p }])
+          else if (fixFor(providers[p]).length > 0) rows.push([{ kind: "providerFix", index: p }])
           continue
         }
         for (var a = 0; a < accounts.length; a++, entry++) {
           var row = []
           if (needsSignIn(accounts[a])) row.push({ kind: "signin", index: entry })
+          else if (fixFor(accounts[a]).length > 0) row.push({ kind: "fix", index: entry })
           if (!accounts[a].active) {
             row.push({ kind: "autoswitch", index: entry })
             row.push({ kind: "account", index: entry })
@@ -499,8 +502,8 @@ Panel {
   function providerIndexOfKey() {
     var target = keyTarget
     if (!target) return -1
-    if (target.kind === "provider" || target.kind === "providerSignin") return target.index
-    if (["account", "autoswitch", "signin"].indexOf(target.kind) < 0) return -1
+    if (target.kind === "provider" || target.kind === "providerSignin" || target.kind === "providerFix") return target.index
+    if (["account", "autoswitch", "signin", "fix"].indexOf(target.kind) < 0) return -1
     var entry = accountEntries[target.index]
     return entry ? providers.indexOf(entry.provider) : -1
   }
@@ -751,6 +754,8 @@ Panel {
     else if (target.kind === "priority") goToPriority(target.index)
     else if (target.kind === "providerSignin") signInAgain(providers[target.index], null)
     else if (target.kind === "signin") signInAgain(pickedEntry.provider, pickedEntry.account)
+    else if (target.kind === "providerFix") runFix(providers[target.index], providers[target.index])
+    else if (target.kind === "fix") runFix(pickedEntry.account, pickedEntry.provider)
     else if (target.kind === "autoswitch") setSwitchMode(pickedEntry.provider, autoSwitchFor(pickedEntry.provider) ? "manual" : "auto")
     else if (pickedEntry && !pickedEntry.account.active) useAccount(pickedEntry.provider, pickedEntry.account)
   }
@@ -789,15 +794,83 @@ Panel {
     return status === "Sign-in expired" || status === "Waiting for auth"
   }
 
-  // Whatever keeps the numbers from being current, said beside the last ones
-  // known: they stay on show until a check succeeds again. A failed refresh
-  // with numbers kept may leave the status empty and say why only in its help.
-  function usageNote(item) {
-    if (!item || needsSignIn(item)) return ""
+  // Whatever keeps the numbers from being current, as a notice: its category
+  // (which picks the icon), a readable body and, for a credentials trouble
+  // that names one, the command that fixes it. The numbers stay on show until
+  // a check succeeds again; a failed refresh with numbers kept may leave the
+  // status empty and say why only in its help.
+  function noticeFor(item) {
+    if (!item || needsSignIn(item)) return null
     var status = String(item.usageStatusText || "")
+    var help = String(item.authHelpText || "")
     var stale = item.limitsStale === true || item.stale === true
-    if (status === "" && !(stale && String(item.authHelpText || "") !== "")) return ""
-    return helpDisplayText(item.authHelpText) || statusDisplayText(status)
+    if (status === "" && !(stale && help !== "")) return null
+    var notice = UsageNotice.fromStatus(status, help)
+    if (!notice) return null
+    var body = helpDisplayText(help)
+    if (body === help) {
+      // Not one of the fixed lines: show the readable form of what it said.
+      body = help === "" ? statusDisplayText(status) : UsageNotice.build(help, "error").body
+    }
+    if (notice.category === "rate_limit") {
+      var wait = UsageNotice.retryAfterMs(status + " " + help)
+      body = wait > 0 ? petStrings.t("agents.rateLimitedIn").arg(formatDuration(wait)) : petStrings.t("agents.rateLimited")
+    }
+    return { category: notice.category, body: body, command: notice.command }
+  }
+
+  function usageNote(item) {
+    var notice = noticeFor(item)
+    return notice ? notice.body : ""
+  }
+
+  readonly property var noticeIcons: ({
+    credentials: "󰌆", network: "󰖪", rate_limit: "󰔟", generic: "󰋽"
+  })
+
+  function noticeIcon(item) {
+    var notice = noticeFor(item)
+    return noticeIcons[notice ? notice.category : "generic"] || noticeIcons.generic
+  }
+
+  // ---------------------------------------------------------------- fixing
+  //
+  // A credentials notice that names a command ("claude auth login") offers it
+  // as a button, but only for a known agent CLI that is actually installed.
+  // It runs in a floating terminal as an argument list, never through a shell
+  // string, and the limits are fetched again once the terminal is closed.
+
+  property var installedClis: []
+  property string fixingId: ""
+
+  function fixFor(item) {
+    var notice = noticeFor(item)
+    if (!notice || notice.category !== "credentials") return []
+    var argv = UsageNotice.fixArgv(notice.command)
+    return argv.length > 0 && installedClis.indexOf(argv[0]) >= 0 ? argv : []
+  }
+
+  // What runs inside the terminal: the logo, the command, then the same
+  // Done / Failed prompt as Omarchy's own (130 is Ctrl-C, which just leaves).
+  // However the terminal goes away, the trap tells the panel it is over.
+  readonly property string fixTerminalScript: "fifo=$1; shift; trap '[ -p \"$fifo\" ] && echo > \"$fifo\"' EXIT HUP; " +
+    "omarchy-show-logo; \"$@\"; code=$?; if (( code != 130 )); then omarchy-show-done $code; fi"
+
+  function runFix(item, owner) {
+    var argv = fixFor(item)
+    if (argv.length === 0 || fixProcess.running) return
+    fixingId = String(owner.providerId)
+    // Like omarchy-launch-floating-terminal-with-presentation, but the command
+    // arrives as "$@" instead of being spliced into the script. The terminal
+    // may hand off to a running instance, so its closing is told by the fifo.
+    fixProcess.command = ["bash", "-lc", [
+      'inner=$1; shift',
+      'fifo=$(mktemp -u "${XDG_RUNTIME_DIR:-/tmp}/agents-pet-fix.XXXXXX") && mkfifo -m 600 "$fifo" || exit 1',
+      'source omarchy-restart-gum',
+      'setsid uwsm-app -- xdg-terminal-exec --app-id=org.omarchy.terminal --title=Omarchy -e bash -c "$inner" bash "$fifo" "$@" >/dev/null 2>&1 &',
+      'read -r -t 1800 <>"$fifo"; rm -f "$fifo"'
+    ].join("\n"), "bash", fixTerminalScript].concat(argv)
+    fixProcess.running = true
   }
 
   // Sign an account that's already here in again, following along in the
@@ -1400,6 +1473,7 @@ Panel {
   implicitHeight: button.implicitHeight
 
   onOpenedChanged: if (opened) {
+    findClis()
     if (addStage !== "running") addStage = ""
     resetKeys()
     if (usage.enabledProviders.length === 0 && !checkProcess.running) checkProcess.running = true
@@ -1488,6 +1562,31 @@ Panel {
         checks[parts[0]] = parts[1]
         root.addChecks = checks
       }
+    }
+  }
+
+  // Which of the known agent CLIs are on PATH, so a Fix button is only offered
+  // for a command that can run.
+  function findClis() {
+    if (cliProcess.running) return
+    cliProcess.found = []
+    cliProcess.command = ["bash", "-lc", 'for c in "$@"; do command -v "$c" >/dev/null && echo "$c"; done', "bash"]
+      .concat(UsageNotice.agentClis())
+    cliProcess.running = true
+  }
+
+  Process {
+    id: cliProcess
+    property var found: []
+    stdout: SplitParser { onRead: function(line) { cliProcess.found = cliProcess.found.concat([String(line).trim()]) } }
+    onExited: root.installedClis = found
+  }
+
+  Process {
+    id: fixProcess
+    onExited: {
+      root.fixingId = ""
+      usage.refreshLimits()
     }
   }
 
@@ -2262,7 +2361,7 @@ Panel {
         anchors.left: sectionName.right
         anchors.leftMargin: Style.space(8)
         anchors.verticalCenter: sectionName.verticalCenter
-        visible: !section.multi && message !== ""
+        visible: !section.multi && message !== "" && root.fixFor(section.provider).length === 0
         record: section.provider
       }
 
@@ -2275,6 +2374,36 @@ Panel {
         color: root.dim
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
+      }
+    }
+
+    // The command that fixes a single-account provider's notice, beside what
+    // the notice says. The row appears only when there is a command to run.
+    Row {
+      id: providerFixRow
+      readonly property var fixArgv: section.multi ? [] : root.fixFor(section.provider)
+      visible: fixArgv.length > 0
+      width: parent.width
+      spacing: Style.space(8)
+
+      Text {
+        id: providerFixBody
+        textFormat: Text.PlainText
+        width: Math.max(0, parent.width - providerFixLink.implicitWidth - parent.spacing)
+        elide: Text.ElideRight
+        text: root.noticeIcon(section.provider) + " " + root.usageNote(section.provider)
+        color: root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+      }
+
+      TextLink {
+        id: providerFixLink
+        picked: root.hasKey("providerFix", section.providerIndex)
+        text: root.fixingId === (section.provider ? section.provider.providerId : "") ? petStrings.t("agents.fixRunning") : petStrings.t("agents.fix")
+        idleColor: Commons.Color.accent
+        tooltip: petStrings.t("agents.fixTooltip").arg(providerFixRow.fixArgv.join(" "))
+        onClicked: root.runFix(section.provider, section.provider)
       }
     }
 
@@ -2822,7 +2951,8 @@ Panel {
           width: Math.max(0, Math.min(implicitWidth, detailRow.width
             - (accountNote.visible ? accountNote.implicitWidth + detailRow.spacing : 0)
             - (signInDot.visible ? signInDot.implicitWidth + detailRow.spacing : 0)
-            - (signInLink.visible ? signInLink.implicitWidth + detailRow.spacing : 0)))
+            - (signInLink.visible ? signInLink.implicitWidth + detailRow.spacing : 0)
+            - (fixLink.visible ? fixLink.implicitWidth + detailRow.spacing : 0)))
           elide: Text.ElideRight
           text: {
             var detail = root.accountDetail(head.account)
@@ -2856,6 +2986,17 @@ Panel {
           idleColor: root.urgent
           tooltip: petStrings.t("agents.signInAgainAccount")
           onClicked: root.signInAgain(head.owner, head.account)
+        }
+
+        TextLink {
+          id: fixLink
+          readonly property var fixArgv: root.fixFor(head.account)
+          visible: fixArgv.length > 0
+          picked: head.pickedKind === "fix"
+          text: root.fixingId === (head.owner ? head.owner.providerId : "") ? petStrings.t("agents.fixRunning") : petStrings.t("agents.fix")
+          idleColor: Commons.Color.accent
+          tooltip: petStrings.t("agents.fixTooltip").arg(fixArgv.join(" "))
+          onClicked: root.runFix(head.account, head.owner)
         }
       }
 
@@ -2937,7 +3078,7 @@ Panel {
     property var record: null
     readonly property string message: root.usageNote(record)
     visible: message !== ""
-    text: "󰋽"
+    text: root.noticeIcon(record)
     textFormat: Text.PlainText
     color: root.dim
     font.family: root.fontFamily

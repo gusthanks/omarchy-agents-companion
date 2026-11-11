@@ -312,5 +312,10 @@
   "notify.creditBody": {
     "one": "You have %1 free reset and it expires in %2. Worth using before it's gone.",
     "other": "You have %1 free resets; the next one expires in %2. Worth using one before it's gone."
-  }
+  },
+  "agents.rateLimited": "Rate limited — trying again soon",
+  "agents.rateLimitedIn": "Rate limited — trying again in %1",
+  "agents.fix": "Fix",
+  "agents.fixRunning": "Fixing…",
+  "agents.fixTooltip": "Open a terminal and run %1"
 }

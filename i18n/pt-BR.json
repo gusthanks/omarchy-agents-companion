@@ -320,5 +320,10 @@
     "many": "Você tem %1 redefinições gratuitas; a próxima expira em %2. Vale usar uma antes que suma.",
     "one": "Você tem %1 redefinição gratuita e ela expira em %2. Vale usar antes que suma.",
     "other": "Você tem %1 redefinições gratuitas; a próxima expira em %2. Vale usar uma antes que suma."
-  }
+  },
+  "agents.rateLimited": "Limite de requisições — tentando de novo em breve",
+  "agents.rateLimitedIn": "Limite de requisições — tentando de novo em %1",
+  "agents.fix": "Resolver",
+  "agents.fixRunning": "Resolvendo…",
+  "agents.fixTooltip": "Abrir um terminal e executar %1"
 }

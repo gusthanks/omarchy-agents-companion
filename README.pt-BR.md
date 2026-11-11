@@ -33,6 +33,11 @@ Você pode remodelá-lo do jeito que quiser.
   faca) quando uma cota semanal está para reiniciar com boa parte sem uso, e uma festinha de
   confete quando uma volta. Cansado vence preocupado, que vence ofegante, que vence com
   fome. A cor dele nunca muda; as barras de limite continuam ficando vermelhas como sempre.
+- **Avisos mais claros**: um agente que não pôde ser lido mostra um ícone do tipo de problema
+  e uma mensagem legível ("Limite de requisições — tentando de novo em 4m" quando o tempo
+  é conhecido). Se o aviso indica um comando de login de uma CLI de agente instalada
+  (`cursor-agent login`), o botão **Resolver** (alcançável pelo teclado) o executa num
+  terminal flutuante e atualiza os limites quando ele fecha.
 - **Notificações na área de trabalho**: quando um limite chega a 97% (`notifyThreshold`),
   o Kian manda um aviso tranquilo com o próprio rosto de ícone ("Claude Semanal está em
   97%. Volta em 1d 4h."), um urgente se ele já estourou, e um lembrete quando uma

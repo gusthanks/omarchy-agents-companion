@@ -40,6 +40,11 @@
 
 ### Panel
 
+- Clearer usage notices: a small icon for the kind of trouble (sign-in, network, rate
+  limit), a readable message, and "Rate limited — trying again in 4m" when the wait is
+  known. When a notice names a sign-in command for an installed agent CLI (`cursor-agent
+  login`, `kimi login`...), a **Fix** button opens it in a floating terminal and fetches the
+  limits again once it closes; the command runs as arguments, never as a shell string.
 - The tip under the pet's name is shown whole, wrapped over up to four lines, instead of
   one line that only opened on hover. The pet and the name stay put as tips of different
   lengths rotate; the panel below eases to the new height. Hovering still pauses the
