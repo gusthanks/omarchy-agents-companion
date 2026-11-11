@@ -29,16 +29,23 @@ Você pode remodelá-lo do jeito que quiser.
 - **Humores pelos limites**: ofegante (boca aberta, bochechas coradas, uma gota de suor e
   baforadas) quando um limite está sendo gasto bem acima de um ritmo constante, preocupado
   (sobrancelhas levantadas, um "!") quando um limite está perto, cansado ("z") quando todas
-  as assinaturas estouraram, e uma festinha de confete quando uma volta. Cansado vence
-  preocupado, que vence ofegante. A cor dele nunca muda; as barras de limite continuam
-  ficando vermelhas como sempre.
+  as assinaturas estouraram, com fome (lambendo os beiços, uma gotinha de baba, garfo e
+  faca) quando uma cota semanal está para reiniciar com boa parte sem uso, e uma festinha de
+  confete quando uma volta. Cansado vence preocupado, que vence ofegante, que vence com
+  fome. A cor dele nunca muda; as barras de limite continuam ficando vermelhas como sempre.
+- **Use primeiro**: com mais de uma assinatura, uma lista curta acima dos agentes diz qual
+  usar antes que a cota semanal reinicie sobrando ("~60% da semanal ficaria sem uso;
+  reinicia em 20h"), depois as que estão no ritmo, esgotadas ou sem números atualizados.
+  Passe o mouse numa linha para ver os números por trás da posição; Enter ou um clique leva
+  aos limites dela.
 - **Ritmo em cada limite**: um tracinho na cor de destaque onde o uso estaria num ritmo
   constante, uma seta ao lado da porcentagem (↑ acima, → no ritmo, ↓ abaixo) e, ao passar o
   mouse, aonde esse ritmo leva ("bate no limite em 1d 9h", "sobra ~92% quando reiniciar").
 - **Chapéus de época**: gorro de Papai Noel em 24–25/12 e chapéu de festa em 31/12 e 1/1.
 - **Uma linha de dica tranquila** sob o nome do bichinho: primeiro as informações ao vivo
   (um limite perto ou no teto com o horário de renovação, um limite sendo gasto rápido demais
-  e quando ele acabaria, uma assinatura mais folgada para trocar, tokens hoje e por sessão,
+  e quando ele acabaria, uma cota prestes a ser desperdiçada ("Codex ainda tem ~60% nesta
+  semana e reinicia em 20h"), uma assinatura mais folgada para trocar, tokens hoje e por sessão,
   um lembrete tarde da noite), depois dicas gerais para trabalhar com agentes.
 - **Pet Studio**: forma, rosto, extras, cor, personalidade e bichinhos salvos, com backup
   e exportação em PNG (veja [Uso](#uso)).
@@ -143,6 +150,10 @@ celebrate, yawn, wake, startle, curious, dizzy, wink, sneeze, thinking, oof, sig
 | Ajustes do widget / `shell.json` → `showAs` | `used` (padrão) ou `left`: se as barras e porcentagens de limite mostram o usado ou o que resta. Os alertas seguem o usado |
 | Ajustes do widget / `shell.json` → `colorCodeUsage` | `true` pinta as barras de verde → amarelo → laranja → vermelho, com as cores do tema, conforme o uso sobe (padrão `false`) |
 | Ajustes do widget / `shell.json` → `showPace` | `false` esconde o tracinho, a seta e a projeção do ritmo (padrão `true`) |
+| Ajustes do widget / `shell.json` → `showPriorities` | `false` esconde o "Use primeiro" e para de guardar o histórico com que ele mede seu ritmo recente (padrão `true`) |
+| Ajustes do widget / `shell.json` → `recentHours` | Horas de uso recente que a previsão pesa contra a média do ciclo, de 1 a 24 (padrão `3`) |
+| Ajustes do widget / `shell.json` → `alertUnusedPercent`, `alertHours` | Uma cota fica urgente quando pelo menos essa parte ficaria sem uso (padrão `50`) e ela reinicia dentro dessas horas (padrão `24`) |
+| Ajustes do widget / `shell.json` → `priorityMood` | `false` impede o bichinho de ficar com fome por uma cota urgente (padrão `true`) |
 | Ajustes do widget / `shell.json` → `moodWindow` | `auto` (padrão), `session` ou `weekly`: as janelas que deixam o bichinho preocupado ou ofegante. Um provedor sem essa janela continua valendo por todas as suas; cansado sempre quer dizer todas as assinaturas no teto |
 
 ## Privacidade
@@ -156,6 +167,9 @@ O bichinho não faz nenhuma chamada de rede. O que ele usa:
 - `agents-pet-backup.json` na pasta Documentos, só quando você aperta **Backup** (grava) ou **Restaurar** (lê). Backups restaurados passam pelas mesmas
   verificações dos códigos colados.
 - `agents-pet-<nome>.png` na pasta Imagens, só quando você aperta **Salvar PNG**.
+- `~/.local/state/omarchy/agents-pet/usage-history.json`: as últimas 25 horas de leituras
+  de limite (janela, porcentagem, horário de renovação) com que o "Use primeiro" mede seu
+  ritmo recente, só enquanto `showPriorities` está ligado.
 
 Os números de uso vêm dos coletores padrão do próprio Omarchy (`omarchy-agent-usage-*`),
 os mesmos que o painel Agents padrão roda. Eles leem os arquivos de credencial locais de
@@ -203,7 +217,7 @@ Veja o [CHANGELOG.md](CHANGELOG.md) (em inglês).
 - Ideia do bichinho paramétrico inspirada no escultor de robôs do app móvel Hermes Agent.
 - O ritmo, a prioridade de "use ou perca", os avisos de limite, a leitura dos avisos e as
   opções de exibição dos limites (usado / restante, faixas de cor, a janela do humor) em
-  `usage/` foram portados do [ai-usagebar](https://github.com/akitaonrails/ai-usagebar), MIT,
+  `usage/`, e os motivos e detalhes do "Use primeiro" em `Panel.qml`, foram portados do [ai-usagebar](https://github.com/akitaonrails/ai-usagebar), MIT,
   Copyright (c) 2026 AkitaOnRails.
 
 ## Licença

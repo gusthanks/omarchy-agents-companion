@@ -179,10 +179,10 @@ ShellRoot {
       // the bodies with the least room.
       Repeater {
         model: [
-          { label: "mood", cells: [{ mood: "normal" }, { mood: "panting" }, { mood: "worried" }, { mood: "tired" }, { mood: "asleep" }, { mood: "happy" }] },
+          { label: "mood", cells: [{ mood: "normal" }, { mood: "hungry" }, { mood: "panting" }, { mood: "worried" }, { mood: "tired" }, { mood: "asleep" }, { mood: "happy" }] },
           { label: "reactions", cells: [{ pose: "yawn" }, { pose: "wake" }, { pose: "startle" }, { pose: "curious" }, { pose: "dizzy" }] },
           { label: "", cells: [{ pose: "wink" }, { pose: "sneeze" }, { pose: "thinking" }, { pose: "oof" }, { pose: "sigh" }] },
-          { label: "cyclops", cells: [{ mood: "worried" }, { mood: "asleep" }, { mood: "happy" }, { pose: "wink" }, { pose: "startle" }], set: { eyes: "cyclops", accessory: "none" } },
+          { label: "cyclops", cells: [{ mood: "hungry" }, { mood: "worried" }, { mood: "asleep" }, { mood: "happy" }, { pose: "wink" }, { pose: "startle" }], set: { eyes: "cyclops", accessory: "none" } },
           { label: "", cells: [{ pose: "curious" }, { pose: "thinking" }, { pose: "dizzy" }, { pose: "yawn" }, { pose: "oof" }], set: { eyes: "cyclops", accessory: "none" } },
           { label: "size", cells: [
             { caption: "0.7", set: { eyeSize: 0.7, mouthSize: 0.7, eyes: "capsule", mouth: "tongue", accessory: "none" } },
@@ -220,7 +220,7 @@ ShellRoot {
                   return sheet.lookWith(set)
                 }
                 themePalette: themeColors
-                mood: ["panting", "worried", "tired"].indexOf(cell.mood) >= 0 ? cell.mood : "normal"
+                mood: ["hungry", "panting", "worried", "tired"].indexOf(cell.mood) >= 0 ? cell.mood : "normal"
                 asleep: cell.mood === "asleep"
                 avatarState: cell.mood === "happy" ? "happy" : "idle"
                 posePreview: cell.modelData.pose || ""

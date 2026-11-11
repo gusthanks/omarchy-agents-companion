@@ -8,11 +8,13 @@ import "usage/Priority.js" as Priority
 // at most 25 hours of {source, window, at, reset, percent}, nothing else. A
 // reading is added when a source's fetch time moves on and it isn't a cached
 // fallback (Priority.append), and the file is written, atomically, only then.
+// With priorities switched off (enabled false) nothing is added or written.
 Item {
   id: root
   visible: false
 
   property var records: []
+  property bool enabled: true
   property string dir: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/agents-pet"
   property var samples: []
 
@@ -22,9 +24,10 @@ Item {
   property bool dirMade: false
 
   onRecordsChanged: update()
+  onEnabledChanged: update()
 
   function update() {
-    if (!ready) return
+    if (!ready || !enabled) return
     var next = Priority.append(samples, records, Date.now())
     if (next.added === 0) return
     samples = next.samples

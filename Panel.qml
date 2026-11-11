@@ -1,3 +1,4 @@
+// Ported from ai-usagebar (MIT, (c) 2026 AkitaOnRails): omarchy/Priority.js ("Use first" reasons and details)
 import QtQuick
 import QtQuick.Controls
 import Quickshell
@@ -9,6 +10,7 @@ import "PetColors.js" as PetColors
 import "usage/Window.js" as UsageWindow
 import "usage/Pacing.js" as UsagePacing
 import "usage/Display.js" as UsageDisplay
+import "usage/Priority.js" as UsagePriority
 
 Panel {
   id: root
@@ -36,6 +38,17 @@ Panel {
   readonly property bool showPace: UsageDisplay.flag(setting("showPace", true), true)
   // Which windows Kian's mood watches: auto | session | weekly.
   readonly property string moodWindow: UsageDisplay.normalizeMoodWindow(setting("moodWindow", "auto"))
+  // Use it or lose it: which subscription to spend first, before its weekly
+  // quota resets with room left. Off, no reading is kept for it either.
+  readonly property bool showPriorities: UsageDisplay.flag(setting("showPriorities", true), true)
+  // Whether an urgent quota makes Kian hungry.
+  readonly property bool priorityMood: UsageDisplay.flag(setting("priorityMood", true), true)
+  // Priority.rank clamps each of these, and falls back on a bad value.
+  readonly property var priorityOptions: ({
+    recentHours: setting("recentHours", 3),
+    alertUnusedPercent: setting("alertUnusedPercent", 50),
+    alertHours: setting("alertHours", 24)
+  })
 
   // Persisted pet: name + look, written by the inline editor.
   readonly property string petConfigPath: (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")) + "/omarchy/agents-pet.json"
@@ -169,7 +182,11 @@ Panel {
     }
     return UsageDisplay.hurried(entries, root.nowMs)
   }
-  readonly property string petMood: allMaxed ? "tired" : (alarming ? "worried" : (hurriedLimit ? "panting" : "normal"))
+  // Hungry when a quota is about to reset with much of it unused: a nudge,
+  // so anything about running out (tired, worried, panting) comes first.
+  readonly property bool hungry: priorityMood && !!hungryRow
+  readonly property string petMood: allMaxed ? "tired"
+    : (alarming ? "worried" : (hurriedLimit ? "panting" : (hungry ? "hungry" : "normal")))
 
   // A subscription coming back from its cap is worth a little party; one
   // newly hitting its cap gets an "oof".
@@ -370,8 +387,8 @@ Panel {
     : null
 
   // The keyboard walks everything on the page that does something, in
-  // reading order, one row at a time: the hero's buttons, then each agent's
-  // header, its Sign-in required link or switchable accounts, and the starter
+  // reading order, one row at a time: the hero's buttons, the "Use first"
+  // lines, then each agent's header, its Sign-in required link or switchable accounts, and the starter
   // tiles, or the agents to add while picking one. Up and down change rows, left and right move along one.
   // Hovering moves the same cursor, so only one thing is lit.
   readonly property var keyRows: {
@@ -388,6 +405,9 @@ Panel {
       for (var k = 0; k < addProviders.length; k++) choices.push({ kind: "choice", index: k })
       rows.push(choices)
     } else if (addStage === "") {
+      // "Use first" lines, one per row, above the agents.
+      if (prioritiesShown)
+        for (var u = 0; u < priorityList.length; u++) rows.push([{ kind: "priority", index: u }])
       // Accounts count in the same order as accountEntries. Only what can be
       // done is a stop: one that isn't active offers Autoswitch beside Use, a
       // lapsed sign-in comes first, and the active account with nothing to
@@ -713,6 +733,7 @@ Panel {
     else if (target.kind === "launch") launchAgent()
     else if (target.kind === "pet") { if (petEditing && petEditor) petEditor.finish(); else petEditing = true }
     else if (String(target.kind).indexOf("pet.") === 0) { if (petEditor) petEditor.activate(target) }
+    else if (target.kind === "priority") goToPriority(target.index)
     else if (target.kind === "providerSignin") signInAgain(providers[target.index], null)
     else if (target.kind === "signin") signInAgain(pickedEntry.provider, pickedEntry.account)
     else if (target.kind === "autoswitch") setSwitchMode(pickedEntry.provider, autoSwitchFor(pickedEntry.provider) ? "manual" : "auto")
@@ -873,6 +894,94 @@ Panel {
 
   function resetMsFor(w) {
     return UsageWindow.resetInMs(w, root.nowMs)
+  }
+
+  // ------------------------------------------------------------- priorities
+  //
+  // The ranking lives in usage/Priority.js, measured against the readings
+  // UsageHistory keeps; the panel lists it under "Use first" once there is
+  // more than one subscription to choose between.
+
+  readonly property var priorityRows: showPriorities
+    ? UsagePriority.rank(providers, usageHistory.samples, root.nowMs, priorityOptions)
+    : []
+  readonly property var priorityList: UsagePriority.listed(priorityRows)
+  readonly property bool prioritiesShown: priorityList.length > 1
+  readonly property var hungryRow: UsagePriority.hungry(priorityRows)
+
+  // An account of a provider that has several goes by both names.
+  function priorityName(row) {
+    if (!row) return ""
+    return row.account ? row.name + " · " + row.accountLabel : String(row.name || "")
+  }
+
+  function priorityWeekly(row) {
+    return UsageDisplay.kindOf(UsageWindow.title(row.window)) === "weekly"
+  }
+
+  function priorityResetText(row) {
+    return root.formatDuration(Number(row.resetMs) - root.nowMs)
+  }
+
+  // Why a line sits where it does, in a few words.
+  function priorityReason(row) {
+    var state = UsagePriority.state(row)
+    var weekly = priorityWeekly(row)
+    if (state === "urgent" || state === "priority")
+      return petStrings.t(weekly ? "priority.unusedWeekly" : "priority.unused")
+        .arg(Commons.I18n.formatNumber(row.unusedPercent)).arg(priorityResetText(row))
+    if (state === "on_track") return petStrings.t("priority.onTrack").arg(priorityResetText(row))
+    if (state === "blocked")
+      return petStrings.t(weekly ? "priority.blockedWeekly" : "priority.blocked").arg(priorityResetText(row))
+    return petStrings.t("priority.unavailable")
+  }
+
+  function priorityRate(value) {
+    return petStrings.t("priority.rate").arg(Commons.I18n.formatNumber(Math.round(Number(value) * 10) / 10))
+  }
+
+  // The numbers behind a line's place, for its tooltip.
+  function priorityDetails(row) {
+    var lines = []
+    var state = UsagePriority.state(row)
+    if (row.window && row.resetMs > 0)
+      lines.push(petStrings.t("agents.windowUsedResets")
+        .arg(windowDisplayTitle(UsageWindow.title(row.window)))
+        .arg(Commons.I18n.formatNumber(state === "blocked" ? 100 : 100 - row.remainingPercent))
+        .arg(priorityResetText(row)))
+    if (state === "urgent" || state === "priority" || state === "on_track") {
+      if (state !== "on_track")
+        lines.push(petStrings.t("priority.projectedUnused").arg(Commons.I18n.formatNumber(row.unusedPercent)))
+      lines.push(petStrings.t("priority.pace").arg(priorityRate(row.pacePerHour)).arg(priorityRate(row.requiredPerHour)))
+      lines.push(row.recentPerHour !== null
+        ? petStrings.t("priority.recent").arg(Commons.I18n.formatNumber(Math.round(row.recentHours * 10) / 10)).arg(priorityRate(row.recentPerHour))
+        : petStrings.t("priority.recentCollecting"))
+    }
+    if (state === "urgent")
+      lines.push(petStrings.t("priority.urgentWhy").arg(Commons.I18n.formatNumber(row.alertUnusedPercent)).arg(Commons.I18n.formatNumber(row.alertHours)))
+    if (row.sessionExhausted) lines.push(petStrings.t("priority.sessionSpent"))
+    if (row.stale && row.fetchedAt > 0)
+      lines.push(petStrings.t("agents.lastUpdatedAgo").arg(formatDuration(root.nowMs - row.fetchedAt)))
+    lines.push(petStrings.t("priority.showLimits"))
+    return lines.join("\n")
+  }
+
+  // A "Use first" line leads to its limits: to Use on an account new
+  // sessions don't take yet, else to the agent's header.
+  function goToPriority(i) {
+    var row = priorityList[i]
+    if (!row) return
+    if (row.account !== "") {
+      for (var e = 0; e < accountEntries.length; e++) {
+        var entry = accountEntries[e]
+        if (entry.provider.providerId === row.provider && String(entry.account.id) === row.account && !entry.account.active) {
+          pointAt("account", e)
+          return
+        }
+      }
+    }
+    for (var p = 0; p < providers.length; p++)
+      if (providers[p].providerId === row.provider) { pointAt("provider", p); return }
   }
 
   // A meter's fill for a used share: the alarm from 90% on, and with
@@ -1116,6 +1225,14 @@ Panel {
         phrase: t.t("tip.burningFast").arg(hurried.provider).arg(root.windowDisplayTitle(hurried.window.title))
           .arg(root.formatDuration(hurried.pace.hitsInMs)) })
     }
+    // What Kian is hungry for: a quota about to go to waste.
+    var hungry = root.hungryRow
+    if (hungry) {
+      list.push({ key: "hungry", badge: t.t("tip.badge.hungry"), icon: "🍽️",
+        phrase: t.t(root.priorityWeekly(hungry) ? "tip.hungryWeekly" : "tip.hungry")
+          .arg(root.priorityName(hungry)).arg(Commons.I18n.formatNumber(hungry.remainingPercent))
+          .arg(root.priorityResetText(hungry)) })
+    }
     if (worst && worst.percent >= 0.9 && calmest && calmest.provider !== worst.provider && calmest.percent < 0.5) {
       list.push({ key: "switch", badge: t.t("tip.badge.switch"), icon: "↻",
         phrase: t.t("tip.switchProvider").arg(calmest.provider).arg(pctText(calmest.percent)) })
@@ -1288,10 +1405,11 @@ Panel {
     settings: root.settings
   }
 
-  // Starts keeping fresh limit readings now, so the priority ranking has a
-  // recent pace to measure once it is shown.
+  // Keeps the fresh limit readings the priority ranking measures the recent
+  // pace from, while priorities are on.
   UsageHistory {
     id: usageHistory
+    enabled: root.showPriorities
     records: usage.enabledProviders
   }
 
@@ -1779,6 +1897,12 @@ Panel {
             width: column.width
           }
 
+          // ---------- Use first: the subscription to spend before its reset ----------
+          PrioritySection {
+            visible: root.addStage === "" && !root.petEditing && root.prioritiesShown
+            width: column.width
+          }
+
           Repeater {
             id: providerSections
             model: root.addStage === "" && !root.petEditing ? root.providers : []
@@ -2223,6 +2347,152 @@ Panel {
           }
         }
       }
+    }
+  }
+
+  // Use it or lose it, as a section of its own above the agents: the
+  // subscriptions in the order worth reaching for, each with why. The rule
+  // under it stands in for the one the first agent leaves out.
+  component PrioritySection: Column {
+    id: prioritySection
+    spacing: Style.space(16)
+
+    Column {
+      width: parent.width
+      spacing: Style.space(12)
+
+      PanelSectionHeader {
+        text: petStrings.t("priority.title")
+        foreground: root.foreground
+        fontFamily: root.fontFamily
+      }
+
+      Repeater {
+        model: prioritySection.visible ? root.priorityList : []
+
+        PriorityLine {
+          required property var modelData
+          required property int index
+          width: prioritySection.width
+          row: modelData
+          place: index
+        }
+      }
+    }
+
+    PanelSeparator { foreground: root.foreground }
+  }
+
+  // One subscription in the "Use first" order: its place, mark and name, a
+  // word for its state on the right and the reason under the name. It's a
+  // keyboard stop; Enter or a click goes to its limits, and hovering shows
+  // the numbers behind its place.
+  component PriorityLine: Item {
+    id: line
+    property var row: ({})
+    property int place: 0
+    readonly property string standing: UsagePriority.state(row)
+    // The ones worth reaching for now carry the accent; the rest are quieter.
+    readonly property bool spare: standing === "urgent" || standing === "priority"
+    readonly property bool lit: root.hasKey("priority", place)
+    onLitChanged: if (lit) root.revealItem(line)
+    implicitHeight: lineName.implicitHeight + Style.space(2) + lineReason.implicitHeight
+
+    CursorSurface {
+      anchors.fill: parent
+      anchors.margins: -Style.space(5)
+      z: -1
+      hasCursor: line.lit
+      foreground: root.foreground
+    }
+
+    TextMetrics {
+      id: linePlaceMetrics
+      font: linePlace.font
+      text: "9"
+    }
+
+    Text {
+      id: linePlace
+      anchors.left: parent.left
+      anchors.verticalCenter: lineName.verticalCenter
+      width: Math.ceil(linePlaceMetrics.advanceWidth)
+      horizontalAlignment: Text.AlignHCenter
+      textFormat: Text.PlainText
+      text: Commons.I18n.formatNumber(line.place + 1)
+      color: line.spare && line.place === 0 ? Commons.Color.accent : root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+    }
+
+    ProviderIcon {
+      id: lineMark
+      anchors.left: linePlace.right
+      anchors.leftMargin: Style.space(8)
+      anchors.verticalCenter: lineName.verticalCenter
+      size: Style.font.body
+      provider: ({ providerId: line.row.provider || "" })
+    }
+
+    Text {
+      id: lineName
+      anchors.left: lineMark.right
+      anchors.leftMargin: Style.space(8)
+      anchors.right: lineState.left
+      anchors.rightMargin: Style.space(8)
+      anchors.top: parent.top
+      textFormat: Text.PlainText
+      text: root.priorityName(line.row)
+      color: line.lit ? Commons.Color.accent : root.foreground
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.bodySmall
+      font.bold: line.spare
+      elide: Text.ElideRight
+    }
+
+    Text {
+      id: lineState
+      anchors.right: parent.right
+      anchors.verticalCenter: lineName.verticalCenter
+      textFormat: Text.PlainText
+      text: petStrings.t("priority.state." + line.standing)
+      color: line.standing === "urgent" ? root.urgent : (line.standing === "priority" ? Commons.Color.accent : root.dim)
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: line.spare
+    }
+
+    Text {
+      id: lineReason
+      anchors.left: lineName.left
+      anchors.right: parent.right
+      anchors.top: lineName.bottom
+      anchors.topMargin: Style.space(2)
+      textFormat: Text.PlainText
+      text: root.priorityReason(line.row)
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      wrapMode: Text.WordWrap
+      maximumLineCount: 2
+      elide: Text.ElideRight
+    }
+
+    MouseArea {
+      id: lineMouse
+      anchors.fill: parent
+      anchors.margins: -Style.space(5)
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onEntered: root.pointAt("priority", line.place)
+      onClicked: root.goToPriority(line.place)
+    }
+
+    PanelToolTip {
+      visible: lineMouse.containsMouse
+      implicitWidth: Math.min(implicitContentWidth + leftPadding + rightPadding, Style.space(320))
+      text: root.priorityDetails(line.row)
     }
   }
 

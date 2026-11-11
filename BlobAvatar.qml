@@ -11,7 +11,7 @@ import "PetClips.js" as PetClips
 //
 // look: { body, eyes, mouth, extra, accessory, cheeks, style, color,
 //         eyeSize, mouthSize }
-// mood (set by the host): "normal" | "panting" | "worried" | "tired"
+// mood (set by the host): "normal" | "hungry" | "panting" | "worried" | "tired"
 Item {
   id: root
 
@@ -843,6 +843,7 @@ Item {
   // and a wink (either eye shut) closes it.
   readonly property bool oneEye: root.eyeStyle === "cyclops"
   readonly property string tongueColor: "#f38ba8"
+  readonly property string droolColor: "#89dceb"
 
   function disc(ctx, x, y, rad) {
     ctx.beginPath()
@@ -1101,6 +1102,7 @@ Item {
     if (m === "grin") return 0.1
     if (m === "o-small") return 0.08
     if (m === "pant") return 0.16
+    if (m === "lick") return 0.2
     return 0.06
   }
 
@@ -1164,6 +1166,50 @@ Item {
       ctx.fill()
       ctx.lineWidth = r * 0.03
       ctx.stroke()
+    } else if (m === "lick") {
+      // Licking his lips: the tongue curls up out of one corner of a smile,
+      // sweeping back and forth, and a drop of drool hangs from the other.
+      var sway = root.animated ? Math.sin(root.phase * 4) * 0.25 : 0
+      ctx.save()
+      ctx.translate(mx + r * 0.1, my - r * 0.01)
+      ctx.rotate(-2.25 + sway)
+      var lt = r * 0.065
+      ctx.moveTo(-lt, 0)
+      ctx.lineTo(-lt, r * 0.07)
+      ctx.arc(0, r * 0.07, lt, Math.PI, 0, true)
+      ctx.lineTo(lt, 0)
+      ctx.closePath()
+      ctx.fillStyle = root.tongueColor
+      ctx.fill()
+      ctx.lineWidth = r * 0.03
+      ctx.stroke()
+      ctx.restore()
+      // The lip line goes over the tongue's root.
+      ctx.beginPath()
+      ctx.lineWidth = r * 0.08
+      ctx.arc(mx, my - r * 0.08, r * 0.14, Math.PI * 0.2, Math.PI * 0.8, false)
+      ctx.stroke()
+      // A thread and a drop that slowly stretches. A tiny pet gets the drop
+      // alone, a little bigger, so it still reads.
+      var drip = root.animated ? (Math.sin(root.phase * 2) + 1) / 2 : 0.5
+      var dx = mx - r * 0.12, dy = my + r * 0.01
+      var dr = r * (root.tiny ? 0.07 : 0.05)
+      var dl = r * (0.05 + 0.04 * drip)
+      ctx.fillStyle = root.droolColor
+      ctx.strokeStyle = root.droolColor
+      if (!root.tiny) {
+        ctx.beginPath()
+        ctx.lineWidth = r * 0.03
+        ctx.moveTo(dx, dy)
+        ctx.lineTo(dx, dy + dl)
+        ctx.stroke()
+      }
+      ctx.beginPath()
+      ctx.moveTo(dx, dy + dl - dr * 1.4)
+      ctx.quadraticCurveTo(dx + dr, dy + dl - dr * 0.2, dx + dr, dy + dl + dr * 0.3)
+      ctx.arc(dx, dy + dl + dr * 0.3, dr, 0, Math.PI, false)
+      ctx.quadraticCurveTo(dx - dr, dy + dl - dr * 0.2, dx, dy + dl - dr * 1.4)
+      ctx.fill()
     } else if (m === "o-small") {
       ctx.ellipse(mx - r * 0.045, my - r * 0.03, r * 0.09, r * 0.1 + 0.02 * r * root.breathe)
       ctx.fill()
@@ -1557,9 +1603,52 @@ Item {
     ctx.fill()
   }
 
+  // A fork and a knife, tipped apart and bobbing in turn like they're being
+  // drummed on the table. Upright, in the marks' ink.
+  function cutlery(ctx, x, y, r, fade) {
+    var h = r * 0.44, w = r * 0.075
+    var bob = root.animated ? Math.sin(root.phase * 3) * r * 0.04 : 0
+    ctx.strokeStyle = root.rgba(root.foreground, 1)
+    ctx.fillStyle = root.rgba(root.foreground, 1)
+    ctx.lineWidth = r * 0.05
+    ctx.lineCap = "round"
+    ctx.lineJoin = "round"
+    // The fork: a handle, and three tines on a rounded bridge.
+    ctx.save()
+    ctx.translate(x - r * 0.1, y - bob)
+    ctx.rotate(-0.22)
+    ctx.beginPath()
+    ctx.moveTo(0, h / 2)
+    ctx.lineTo(0, -h * 0.08)
+    ctx.moveTo(-w, -h / 2)
+    ctx.lineTo(-w, -h * 0.2)
+    ctx.quadraticCurveTo(-w, -h * 0.06, 0, -h * 0.06)
+    ctx.quadraticCurveTo(w, -h * 0.06, w, -h * 0.2)
+    ctx.lineTo(w, -h / 2)
+    ctx.moveTo(0, -h / 2)
+    ctx.lineTo(0, -h * 0.12)
+    ctx.stroke()
+    ctx.restore()
+    // The knife: a handle and a blade rounded on one side.
+    ctx.save()
+    ctx.translate(x + r * 0.12, y + bob)
+    ctx.rotate(0.22)
+    ctx.beginPath()
+    ctx.moveTo(0, h / 2)
+    ctx.lineTo(0, -h * 0.02)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(-r * 0.025, 0)
+    ctx.lineTo(-r * 0.025, -h / 2)
+    ctx.quadraticCurveTo(r * 0.09, -h * 0.4, r * 0.06, 0)
+    ctx.closePath()
+    ctx.fill()
+    ctx.restore()
+  }
+
   // Small floating marks: "!" when worried, "z" when tired or asleep, a sweat
-  // drop and puffs of breath when panting, and the reactions' own ("?",
-  // "...", a sweat drop, dizzy stars).
+  // drop and puffs of breath when panting, a fork and knife when hungry, and
+  // the reactions' own ("?", "...", a sweat drop, dizzy stars).
   function paintMarks(ctx, S, cx, cy, r) {
     var f = root.face
     var mk = f.mark
@@ -1603,6 +1692,8 @@ Item {
         ctx.globalAlpha = (1 - u * 0.75) * 0.85 * fade
         root.disc(ctx, cx + r * (1.14 + 0.2 * u), cy + r * (0.15 - 0.2 * u), r * (0.07 + 0.05 * u))
       }
+    } else if (mk === "cutlery") {
+      root.cutlery(ctx, cx + r * 0.98, cy - r * 0.82, r, fade)
     } else if (mk === "stars") {
       ctx.font = "bold " + Math.round(r * 0.3) + "px sans-serif"
       for (var j = 0; j < 3; j++) {

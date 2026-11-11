@@ -225,3 +225,21 @@ test('accounts rank separately', () => {
   ] });
   assert.deepEqual(rank([rec]).map(r => [r.key, r.account]), [['codex@y', 'y'], ['codex@x', 'x']]);
 });
+
+test('listed rows, row states and the hungry pick', () => {
+  const r = rank([
+    weekly('spent', 100),
+    provider('nolong', [limit('Session (5-hour)', 10, H)]),
+    weekly('soon', 10),
+    weekly('busy', 95),
+  ], [], { alertUnusedPercent: 50, alertHours: 48 });
+  assert.deepEqual(P.listed(r).map(x => x.key), ['soon', 'busy', 'spent']);
+  assert.deepEqual(r.map(P.state), ['urgent', 'on_track', 'unknown', 'blocked']);
+  assert.equal(P.hungry(r).key, 'soon');
+  // Spare quota that resets later than the alert horizon isn't urgent.
+  const later = rank([weekly('soon', 10)], [], { alertHours: 12 });
+  assert.equal(P.state(later[0]), 'priority');
+  assert.equal(P.hungry(later), null);
+  assert.equal(P.hungry([]), null);
+  assert.equal(P.state(null), 'unknown');
+});

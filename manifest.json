@@ -104,7 +104,12 @@
       "showAs": "used",
       "colorCodeUsage": false,
       "showPace": true,
-      "moodWindow": "auto"
+      "moodWindow": "auto",
+      "showPriorities": true,
+      "recentHours": 3,
+      "alertUnusedPercent": 50,
+      "alertHours": 24,
+      "priorityMood": true
     },
     "schema": [
       {
@@ -191,6 +196,50 @@
         ],
         "defaultValue": "auto",
         "description": "Which limit windows make the pet worried or out of breath. Auto watches all of them; a provider without the chosen window keeps all of its own. Tired always means every subscription is capped."
+      },
+      {
+        "key": "showPriorities",
+        "type": "boolean",
+        "label": "Show what to use first",
+        "defaultValue": true,
+        "description": "Rank your subscriptions by how much of each weekly quota would go unused at its reset, under \"Use first\" in the panel. Keeps a small local history of fresh limit readings (25 hours at most) to measure your recent pace; off, nothing is recorded."
+      },
+      {
+        "key": "recentHours",
+        "type": "integer",
+        "label": "Recent pace window (hours)",
+        "min": 1,
+        "max": 24,
+        "step": 1,
+        "defaultValue": 3,
+        "description": "How many hours of recent use the forecast weighs against the cycle's average. Longer smooths out bursts."
+      },
+      {
+        "key": "alertUnusedPercent",
+        "type": "integer",
+        "label": "Urgent when unused is at least (%)",
+        "min": 1,
+        "max": 100,
+        "step": 5,
+        "defaultValue": 50,
+        "description": "A quota is urgent when at least this share is projected to go unused..."
+      },
+      {
+        "key": "alertHours",
+        "type": "integer",
+        "label": "...and it resets within (hours)",
+        "min": 1,
+        "max": 168,
+        "step": 1,
+        "defaultValue": 24,
+        "description": "...and its reset is this close."
+      },
+      {
+        "key": "priorityMood",
+        "type": "boolean",
+        "label": "Pet gets hungry over urgent quota",
+        "defaultValue": true,
+        "description": "The pet looks hungry while a quota is urgent, below worried, tired and out of breath."
       }
     ]
   },

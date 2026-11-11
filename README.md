@@ -27,15 +27,22 @@ reshape it however you like.
   it sneezes or yawns. The bar pet only shows still poses, so it stays cheap.
 - **Moods from your limits**: out of breath (open mouth, flushed cheeks, a sweat drop and
   puffs) when a limit is burning well ahead of an even pace, worried (raised brows, a little
-  "!") when one is close, tired ("z") when every subscription is maxed out, and a small
-  confetti party when one comes back. Tired beats worried, worried beats out of breath. Its
-  color never changes; the limit bars still turn red as usual.
+  "!") when one is close, tired ("z") when every subscription is maxed out, hungry (licking
+  its lips, a drop of drool, a fork and knife) when a weekly quota is about to reset with
+  much of it unused, and a small confetti party when one comes back. Tired beats worried,
+  worried beats out of breath, out of breath beats hungry. Its color never changes; the
+  limit bars still turn red as usual.
+- **Use first**: with more than one subscription, a short list above the agents says which
+  one to reach for before its weekly quota resets with room left over ("~60% of the weekly
+  would go unused, resets in 20h"), then the ones on pace, spent or without current numbers.
+  Hover a line for the numbers behind its place; Enter or a click goes to its limits.
 - **Pace on every limit**: a small accent tick where usage would be at an even pace, an
   arrow beside the percentage (↑ ahead, → on track, ↓ under), and on hover where that pace
   leads ("hits the limit in 1d 9h", "~92% left at reset").
 - **Seasonal hats**: a Santa hat on Dec 24–25 and a party hat on Dec 31 / Jan 1.
 - **One calm tip line** under the pet's name: live insights first (a limit near or at its
-  cap with its reset time, a limit burning too fast and when it would run out, a quieter
+  cap with its reset time, a limit burning too fast and when it would run out, a quota
+  about to go to waste ("Codex still has ~60% this week and resets in 20h"), a quieter
   subscription to switch to, tokens today and per session, a late-night nudge), then a pool of general tips for working with agents.
 - **Pet Studio**: shape, face, extras, color, personality and saved pets, with backup and
   PNG export (see [Use](#use)).
@@ -134,6 +141,10 @@ celebrate, yawn, wake, startle, curious, dizzy, wink, sneeze, thinking, oof, sig
 | Widget settings / `shell.json` → `showAs` | `used` (default) or `left`: what the limit meters and percentages read. Alerts still follow the share used |
 | Widget settings / `shell.json` → `colorCodeUsage` | `true` colors the meters green → yellow → orange → red from the theme as usage climbs (default `false`) |
 | Widget settings / `shell.json` → `showPace` | `false` hides the pace tick, arrow and projection (default `true`) |
+| Widget settings / `shell.json` → `showPriorities` | `false` hides "Use first" and stops keeping the history it measures your recent pace from (default `true`) |
+| Widget settings / `shell.json` → `recentHours` | Hours of recent use the forecast weighs against the cycle's average, 1–24 (default `3`) |
+| Widget settings / `shell.json` → `alertUnusedPercent`, `alertHours` | A quota is urgent when at least this share would go unused (default `50`) and it resets within these hours (default `24`) |
+| Widget settings / `shell.json` → `priorityMood` | `false` keeps the pet from getting hungry over an urgent quota (default `true`) |
 | Widget settings / `shell.json` → `moodWindow` | `auto` (default), `session` or `weekly`: the windows that make the pet worried or out of breath. A provider without that window keeps all of its own; tired always means every subscription is capped |
 
 ## Privacy
@@ -147,6 +158,9 @@ The pet adds no network calls. What it touches:
 - `agents-pet-backup.json` in your Documents folder, only when you press **Back up all**
   (write) or **Restore** (read). Restored backups get the same checks as pasted codes.
 - `agents-pet-<name>.png` in your Pictures folder, only when you press **Save PNG**.
+- `~/.local/state/omarchy/agents-pet/usage-history.json`: the last 25 hours of limit
+  readings (window, percentage, reset time) that "Use first" measures your recent pace
+  from, only while `showPriorities` is on.
 
 Usage numbers come from Omarchy's own stock collectors (`omarchy-agent-usage-*`), the same
 ones the stock Agents panel runs. They read each agent's local credential files (for example
@@ -209,7 +223,8 @@ See [CHANGELOG.md](CHANGELOG.md).
   Copyright (c) David Heinemeier Hansson.
 - Parametric pet idea inspired by the Hermes Agent mobile app's bot sculptor.
 - Pacing, use-it-or-lose-it priority, limit notifications, notice parsing and the limit
-  display options (used / left, color rungs, the mood's window) in `usage/` are ported from [ai-usagebar](https://github.com/akitaonrails/ai-usagebar), MIT,
+  display options (used / left, color rungs, the mood's window) in `usage/`, and the "Use
+  first" reasons and details in `Panel.qml`, are ported from [ai-usagebar](https://github.com/akitaonrails/ai-usagebar), MIT,
   Copyright (c) 2026 AkitaOnRails.
 
 ## License

@@ -270,3 +270,24 @@ function recommendation(rows) {
     if (rows[i].status === "priority") return rows[i]
   return null
 }
+
+// The rows the panel's "Use first" list shows: a source with no window of a
+// day or longer ("unknown") has no forecast to rank it by.
+function listed(rows) {
+  return (rows || []).filter(function(r) { return r.status !== "unknown" })
+}
+
+// "urgent" | "priority" | "on_track" | "blocked" | "unavailable" | "unknown":
+// what a row's line says, urgency being a kind of priority.
+function state(row) {
+  if (!row) return "unknown"
+  return row.status === "priority" && row.urgent ? "urgent" : row.status
+}
+
+// The quota Kian gets hungry over: the first urgent row, which the ranking
+// already puts first (the most to lose per hour left). Null when none is.
+function hungry(rows) {
+  for (var i = 0; i < (rows || []).length; i++)
+    if (state(rows[i]) === "urgent") return rows[i]
+  return null
+}

@@ -57,18 +57,31 @@
   even pace with 20% or more used and no cap near yet; worried and tired win over it. A
   matching tip says when that limit would run out, and takes the place of "limits look
   healthy".
+- **Use first**: with more than one subscription, a section above the agents lists them in
+  the order worth using, from the use-it-or-lose-it ranking: each with its state (urgent,
+  spare, on pace, spent, no data) and why ("~60% of the weekly would go unused, resets in
+  20h"). Each line is a keyboard stop; Enter or a click goes to its limits (to Use, for an
+  account new sessions don't take yet), and hovering shows the numbers behind its place.
+- Kian gets **hungry** (licking his lips with a drop of drool, eager eyes on a fork and
+  knife) while a weekly quota is urgent: at least `alertUnusedPercent` projected unused and
+  a reset within `alertHours`. Tired, worried and out of breath win over it. A tip says
+  so: "Codex still has ~60% this week and resets in 20h — a good time to use it".
+- New widget settings: `showPriorities` (off, nothing is ranked or recorded),
+  `recentHours`, `alertUnusedPercent`, `alertHours` and `priorityMood`. Configs without
+  them get the defaults.
 
 ### Usage math
 
 - The limit-window rules (titles, lengths, expired resets) moved from the panel to
   `usage/Window.js`; the panel shows the same thing.
 - New pure, tested libraries in `usage/`: pacing with a projection to the reset (now shown
-  on the meters), and, not shown yet, a use-it-or-lose-it priority across subscriptions and
-  accounts, limit and reset credit notification decisions, and notice parsing. Ported from
+  on the meters), a use-it-or-lose-it priority across subscriptions and accounts (now shown
+  under "Use first"), and, not shown yet, limit and reset credit notification decisions,
+  and notice parsing. Ported from
   ai-usagebar (MIT).
 - The panel keeps the last 25 hours of fresh limit readings in
   `~/.local/state/omarchy/agents-pet/usage-history.json` (percentages and reset times
-  only), for the priority's recent pace.
+  only), for the priority's recent pace, while `showPriorities` is on.
 - `usage/Display.js` (ported from ai-usagebar): used / left readings, color rungs, the pace
   arrow, the mood's windows and when the pet pants.
 - `dev/run.sh test` runs the Node tests; `dev/run.sh check` also compiles `usage/`.
